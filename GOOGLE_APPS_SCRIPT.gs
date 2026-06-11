@@ -1,0 +1,243 @@
+/**
+ * Google Apps Script for syncing Firestore data to Google Sheets
+ * 
+ * Instructions:
+ * 1. Open a Google Sheet
+ * 2. Go to Extensions > Apps Script
+ * 3. Paste this code into the editor
+ * 4. Click "Deploy" > "New Deployment"
+ * 5. Select "Web App"
+ * 6. Execute as: "Me"
+ * 7. Who has access: "Anyone"
+ * 8. Copy the Web App URL and set it as VITE_GOOGLE_SHEET_URL in your app settings
+ */
+
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const action = data.action;
+    const sheetName = data.sheet;
+    const payload = data.payload;
+
+    if (!sheetName) return response({ status: 'error', message: 'Sheet name is required' });
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName(sheetName);
+    
+    // Create sheet if it doesn't exist
+    if (!sheet) {
+      sheet = ss.insertSheet(sheetName);
+    }
+
+    if (action === 'sync') {
+      return syncRecord(sheet, payload);
+    } else if (action === 'batchSync') {
+      return batchSync(sheet, payload);
+    } else if (action === 'delete') {
+      return deleteRecord(sheet, payload.id);
+    } else {
+      return response({ status: 'error', message: 'Invalid action' });
+    }
+  } catch (error) {
+    return response({ status: 'error', message: error.toString() });
+  }
+}
+
+function doGet(e) {
+  try {
+    const action = e.parameter.action;
+    const sheetName = e.parameter.sheet;
+
+    if (action === 'read') {
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const sheet = ss.getSheetByName(sheetName);
+      if (!sheet) return response([]);
+      
+      const data = getSheetData(sheet);
+      return response(data);
+    }
+    
+    return response({ status: 'ok', message: 'Service is running' });
+  } catch (error) {
+    return response({ status: 'error', message: error.toString() });
+  }
+}
+
+function syncRecord(sheet, payload) {
+  const headers = getOrUpdateHeaders(sheet, payload);
+  const data = getSheetData(sheet);
+  const idIndex = headers.indexOf('id');
+  
+  if (idIndex === -1) {
+    return response({ status: 'error', message: 'No "id" column found' });
+  }
+
+  const rowIndex = data.findIndex(row => row.id == payload.id);
+  const rowValues = headers.map(header => {
+    let val = findValueInPayload(header, payload);
+    if (val === undefined) return '';
+    if (val === 'TRUE' || val === 'true') return true;
+    if (val === 'FALSE' || val === 'false') return false;
+    return val;
+  });
+
+  if (rowIndex > -1) {
+    // Update existing row (rowIndex + 2 because 1-indexed and header row)
+    sheet.getRange(rowIndex + 2, 1, 1, rowValues.length).setValues([rowValues]);
+  } else {
+    // Append new row
+    sheet.appendRow(rowValues);
+  }
+
+  return response({ status: 'success' });
+}
+
+function deleteRecord(sheet, id) {
+  const data = getSheetData(sheet);
+  const rowIndex = data.findIndex(row => row.id == id);
+  
+  if (rowIndex > -1) {
+    sheet.deleteRow(rowIndex + 2);
+    return response({ status: 'success' });
+  }
+  
+  return response({ status: 'not_found' });
+}
+
+function getOrUpdateHeaders(sheet, payload) {
+  let headers = [];
+  if (sheet.getLastColumn() > 0) {
+    headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  }
+
+  const payloadKeys = Object.keys(payload);
+  let headersChanged = false;
+
+  payloadKeys.forEach(key => {
+    if (headers.indexOf(key) === -1) {
+      headers.push(key);
+      headersChanged = true;
+    }
+  });
+
+  if (headersChanged) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    // Format header
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#f3f3f3');
+  }
+
+  return headers;
+}
+
+function getSheetData(sheet) {
+  if (sheet.getLastRow() < 2) return [];
+  
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+  
+  return values.map(row => {
+    const obj = {};
+    headers.forEach((header, i) => {
+      obj[header] = row[i];
+    });
+    return obj;
+  });
+}
+
+function response(data) {
+  return ContentService.createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function batchSync(sheet, payloads) {
+  if (!Array.isArray(payloads)) {
+    return response({ status: 'error', message: 'Payload must be an array' });
+  }
+
+  // 1. Get or update headers
+  let headers = [];
+  if (sheet.getLastColumn() > 0) {
+    headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  } else {
+    headers = ['id'];
+  }
+  
+  const idIndex = headers.indexOf('id');
+  if (idIndex === -1) {
+    headers.push('id');
+  }
+
+  let headersChanged = false;
+  payloads.forEach(p => {
+    Object.keys(p).forEach(key => {
+      if (headers.indexOf(key) === -1) {
+        headers.push(key);
+        headersChanged = true;
+      }
+    });
+  });
+
+  if (headersChanged) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#f3f3f3');
+  }
+
+  // 2. Fetch existing rows (including the newly added columns/headers space)
+  const lastRow = sheet.getLastRow();
+  let existingRows = [];
+  if (lastRow >= 2) {
+    existingRows = sheet.getRange(2, 1, lastRow - 1, headers.length).getValues();
+  }
+
+  // Map row list to an index map by 'id'
+  const idToRowIndex = {};
+  existingRows.forEach((row, idx) => {
+    const rowId = row[idIndex];
+    if (rowId) {
+      idToRowIndex[rowId] = idx;
+    }
+  });
+
+  // 3. Process each payload
+  payloads.forEach(p => {
+    const rowValues = headers.map(header => {
+      let val = findValueInPayload(header, p);
+      if (val === undefined) return '';
+      if (val === 'TRUE' || val === 'true') return true;
+      if (val === 'FALSE' || val === 'false') return false;
+      return val;
+    });
+
+    const existingIdx = idToRowIndex[p.id];
+    if (existingIdx !== undefined) {
+      existingRows[existingIdx] = rowValues;
+    } else {
+      existingRows.push(rowValues);
+      idToRowIndex[p.id] = existingRows.length - 1;
+    }
+  });
+
+  // 4. Write everything back in ONE single operation
+  if (existingRows.length > 0) {
+    sheet.getRange(2, 1, existingRows.length, headers.length).setValues(existingRows);
+  }
+
+  return response({ status: 'success', count: payloads.length });
+}
+
+function findValueInPayload(header, payload) {
+  if (header === undefined || header === null) return undefined;
+  var headerStr = header.toString();
+  if (payload[headerStr] !== undefined) return payload[headerStr];
+  
+  // Clean header lookup (lowercase and trimmed)
+  var cleanHeader = headerStr.trim().toLowerCase();
+  var keys = Object.keys(payload);
+  for (var i = 0; i < keys.length; i++) {
+    var key = keys[i];
+    if (key.trim().toLowerCase() === cleanHeader) {
+      return payload[key];
+    }
+  }
+  return undefined;
+}

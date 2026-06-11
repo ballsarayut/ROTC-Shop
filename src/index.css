@@ -1,0 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  /* Thai Military Palette */
+  --color-army-dark: #2D3319;
+  --color-army-primary: #4B5320;
+  --color-army-muted: #6B734D;
+  --color-army-light: #A2AD91;
+  --color-army-bg: #F9FAF7;
+  --color-army-accent: #C5A059;
+}
+
+@layer base {
+  body {
+    @apply text-army-dark antialiased bg-army-bg;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-army-bg;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-army-light rounded-full hover:bg-army-muted transition-colors;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Tactical Accents */
+.tactical-border {
+  @apply border-2 border-army-primary/30 shadow-[4px_4px_0px_0px_rgba(75,83,32,0.1)];
+}
+
+.tactical-button {
+  @apply bg-army-primary text-white font-black uppercase tracking-widest px-6 py-3 transition-all active:translate-x-[2px] active:translate-y-[2px] active:shadow-none shadow-[4px_4px_0px_0px_rgba(75,83,32,0.2)] hover:bg-army-dark rounded-xl;
+}

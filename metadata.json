@@ -1,0 +1,8 @@
+{
+  "name": "Remix: ROTC Shop (นศท. สโตร์)",
+  "description": "ระบบสั่งซื้อเครื่องแบบและอุปกรณ์นักศึกษาวิชาทหาร (นศท.) ออนไลน์ ครบวงจร เท่ มินิมอล ใช้งานง่าย",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

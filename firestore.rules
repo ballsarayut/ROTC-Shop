@@ -1,0 +1,166 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: products
+    // Fields:
+    //   - name: string (required)
+    //   - description: string
+    //   - price: number (required, positive)
+    //   - category: string (required)
+    //   - imageUrl: string (url)
+    //   - stock: number (required, >= 0)
+    //   - sizes: list of strings
+    //   - colors: list of strings
+    //   - genders: list of strings
+    //   - createdAt: timestamp
+    //   - updatedAt: timestamp
+    //
+    // Collection: orders
+    // Fields:
+    //   - fullName: string (required, 1-200 chars)
+    //   - trainingCenter: string (required)
+    //   - school: string (required)
+    //   - year: string (required)
+    //   - gender: string (required)
+    //   - height: string (required)
+    //   - phone: string (required)
+    //   - items: list of maps (required, max 50 items)
+    //   - totalAmount: number (required, positive)
+    //   - paymentMethod: string (transfer, qr)
+    //   - slipUrl: string (optional, url)
+    //   - status: string (pending, verifying, preparing, completed, cancelled)
+    //   - deliveryMethod: string (school)
+    //   - createdAt: timestamp
+    //   - updatedAt: timestamp
+    //
+    // Collection: categories
+    // Fields:
+    //   - name: string (required)
+    //   - icon: string
+    //
+    // Collection: users
+    // Fields:
+    //   - email: string
+    //   - role: string (admin, user)
+    // ===============================================================
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (
+          (request.auth.token.email == "masterball.dbs@gmail.com") ||
+          (exists(/databases/$(database)/documents/users/$(request.auth.token.email)) && 
+           get(/databases/$(database)/documents/users/$(request.auth.token.email)).data.role == 'admin') ||
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+        );
+    }
+
+    function isValidUrl(url) {
+      return url is string && url.size() < 1000 && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    function isValidImageUrl(url) {
+      return url is string && url.size() < 1000000 && (url.matches("^https://.*") || url.matches("^http://.*") || url.matches("^data:image/.*"));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.size() < 200 && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidProduct(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.price is number && data.price >= 0 &&
+             data.stock is number && data.stock >= 0 &&
+             data.category is string && data.category.size() < 100 &&
+             (!('description' in data) || (data.description is string && data.description.size() < 5000)) &&
+             (!('imageUrl' in data) || (data.imageUrl == "" || isValidImageUrl(data.imageUrl))) &&
+             (!('sizes' in data) || data.sizes is list) &&
+             (!('colors' in data) || data.colors is list) &&
+             (!('genders' in data) || data.genders is list);
+    }
+
+    function isValidOrder(data) {
+      return data.fullName is string && data.fullName.size() > 0 && data.fullName.size() < 200 &&
+             data.trainingCenter is string && data.trainingCenter.size() > 0 &&
+             data.school is string && data.school.size() > 0 &&
+             data.year in ["นศท. ชั้นปีที่ 1", "นศท. ชั้นปีที่ 2", "นศท. ชั้นปีที่ 3", "นศท. ชั้นปีที่ 4", "นศท. ชั้นปีที่ 5"] &&
+             data.gender in ["ชาย", "หญิง"] &&
+             data.height is string && data.height.size() > 0 &&
+             data.phone is string && data.phone.size() > 0 &&
+             data.items is list && data.items.size() > 0 && data.items.size() <= 50 &&
+             data.totalAmount is number && data.totalAmount >= 0 &&
+             (!('subtotal' in data) || (data.subtotal is number && data.subtotal >= 0)) &&
+             (!('shippingFee' in data) || (data.shippingFee is number && data.shippingFee >= 0)) &&
+             data.status in ['pending', 'verifying', 'preparing', 'completed', 'cancelled'] &&
+             data.paymentMethod in ['transfer', 'qr'] &&
+             data.deliveryMethod in ['school'] &&
+             (!('slipUrl' in data) || (data.slipUrl == "" || isValidImageUrl(data.slipUrl))) &&
+             (!('paymentRef' in data) || (data.paymentRef == "" || isValidImageUrl(data.paymentRef) || data.paymentRef is string)) &&
+             (!('createdAt' in data) || data.createdAt is timestamp) &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp) &&
+             (!('aiVerification' in data) || data.aiVerification is map);
+    }
+
+    // Rules
+    match /products/{productId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
+    }
+
+    match /orders/{orderId} {
+      // Allow anyone to create an order (students don't login)
+      allow create: if true;
+      // Allow anyone to read their own order if they have the ID (for tracking)
+      allow get: if true;
+      // Allow list so users can search by phone number
+      allow list: if true;
+      allow update: if true;
+      allow delete: if isAdmin();
+    }
+
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == userId || 
+        request.auth.token.email == userId ||
+        isAdmin() ||
+        (resource != null && resource.data.email == request.auth.token.email)
+      );
+      allow write: if isAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow get, list: if true;
+      allow write: if isAdmin();
+    }
+
+    match /training-centers/{centerId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /schools/{schoolId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /test/{documentId} {
+      allow read: if true;
+    }
+  }
+}

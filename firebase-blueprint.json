@@ -1,0 +1,135 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "สินค้าในสหกรณ์โรงเรียน",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "description": "ชื่อสินค้า" },
+        "description": { "type": "string", "description": "รายละเอียดสินค้า" },
+        "price": { "type": "number", "description": "ราคาสินค้า" },
+        "category": { "type": "string", "description": "หมวดหมู่สินค้า" },
+        "imageUrl": { "type": "string", "description": "URL รูปภาพสินค้า" },
+        "stock": { "type": "number", "description": "จำนวนสินค้าในคลัง" },
+        "sizes": { "type": "array", "items": { "type": "string" }, "description": "ไซส์ที่รองรับ (เช่น S, M, L)" },
+        "colors": { "type": "array", "items": { "type": "string" }, "description": "สีที่รองรับ" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "price", "category", "stock"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "รายการสั่งซื้อสินค้า",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fullName": { "type": "string", "description": "ชื่อ-นามสกุล นศท. (ไม่มีคำนำหน้า)" },
+        "trainingCenter": { "type": "string", "description": "ศูนย์ฝึก" },
+        "school": { "type": "string", "description": "โรงเรียน" },
+        "year": { "type": "string", "enum": ["นศท. ชั้นปีที่ 1", "นศท. ชั้นปีที่ 2", "นศท. ชั้นปีที่ 3", "นศท. ชั้นปีที่ 4", "นศท. ชั้นปีที่ 5"], "description": "ชั้นปี" },
+        "gender": { "type": "string", "enum": ["ชาย", "หญิง"], "description": "เพศ" },
+        "height": { "type": "string", "description": "ส่วนสูง" },
+        "phone": { "type": "string", "description": "เบอร์โทรศัพท์" },
+        "items": { 
+          "type": "array", 
+          "items": { 
+            "type": "object",
+            "properties": {
+              "productId": { "type": "string" },
+              "name": { "type": "string" },
+              "price": { "type": "number" },
+              "quantity": { "type": "number" },
+              "size": { "type": "string" },
+              "color": { "type": "string" }
+            }
+          }
+        },
+        "totalAmount": { "type": "number", "description": "ยอดรวมทั้งหมด" },
+        "paymentMethod": { "type": "string", "enum": ["transfer", "qr"], "description": "วิธีการชำระเงิน" },
+        "slipUrl": { "type": "string", "description": "URL สลิปการโอนเงิน" },
+        "status": { "type": "string", "enum": ["pending", "verifying", "preparing", "ready", "completed", "cancelled"], "description": "สถานะคำสั่งซื้อ" },
+        "deliveryMethod": { "type": "string", "enum": ["school"], "description": "วิธีรับสินค้า" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["fullName", "trainingCenter", "school", "year", "gender", "height", "phone", "items", "totalAmount", "paymentMethod", "status"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "หมวดหมู่สินค้า",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "icon": { "type": "string", "description": "ชื่อไอคอน Lucide" }
+      },
+      "required": ["name"]
+    },
+    "PaymentSettings": {
+      "title": "PaymentSettings",
+      "description": "การตั้งค่าการชำระเงิน",
+      "type": "object",
+      "properties": {
+        "bankName": { "type": "string", "description": "ชื่อธนาคาร" },
+        "accountNumber": { "type": "string", "description": "เลขที่บัญชี" },
+        "accountName": { "type": "string", "description": "ชื่อบัญชี" },
+        "qrCodeUrl": { "type": "string", "description": "URL รูปภาพ QR Code" }
+      },
+      "required": ["bankName", "accountNumber", "accountName", "qrCodeUrl"]
+    },
+    "TrainingCenter": {
+      "title": "TrainingCenter",
+      "description": "ศูนย์ฝึกนักศึกษาวิชาทหาร",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "description": "ชื่อศูนย์ฝึก" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name"]
+    },
+    "School": {
+      "title": "School",
+      "description": "โรงเรียนในสังกัดศูนย์ฝึก",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "description": "ชื่อโรงเรียน" },
+        "trainingCenterId": { "type": "string", "description": "ID ของศูนย์ฝึกที่สังกัด" },
+        "trainingCenterName": { "type": "string", "description": "ชื่อของศูนย์ฝึกที่สังกัด" },
+        "shippingAddress": { "type": "string", "description": "ที่อยู่จัดส่งของโรงเรียน" },
+        "contactPerson": { "type": "string", "description": "ชื่อผู้ติดต่อ (เช่น ครูผู้ดูแล)" },
+        "contactPhone": { "type": "string", "description": "เบอร์โทรศัพท์ผู้ติดต่อ" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "trainingCenterId"]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "คอลเลกชันสินค้าทั้งหมด"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "คอลเลกชันรายการสั่งซื้อ"
+    },
+    "/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "คอลเลกชันหมวดหมู่สินค้า"
+    },
+    "/settings/payment": {
+      "schema": "PaymentSettings",
+      "description": "การตั้งค่าการชำระเงิน"
+    },
+    "/training-centers/{centerId}": {
+      "schema": "TrainingCenter",
+      "description": "คอลเลกชันศูนย์ฝึกทั้งหมด"
+    },
+    "/schools/{schoolId}": {
+      "schema": "School",
+      "description": "คอลเลกชันโรงเรียนทั้งหมด"
+    }
+  }
+}
