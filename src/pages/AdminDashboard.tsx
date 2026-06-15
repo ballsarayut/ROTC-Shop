@@ -682,7 +682,7 @@ export default function AdminDashboard() {
         // @ts-ignore
         if (window._isSyncPaused) return; // if sync started while we were fetching
 
-        let firestoreStates: Record<string, { isEmbroidered?: boolean; isOrdered?: boolean }> = {};
+        let firestoreStates: Record<string, { isEmbroidered?: boolean; isOrdered?: boolean; school?: string; trainingCenter?: string }> = {};
         let didFetchFS = false;
 
         // 2. Fetch Firestore on-demand with a 1.2s Promise.race timeout so that even if the database is over quota,
@@ -709,6 +709,8 @@ export default function AdminDashboard() {
                   firestoreStates[docSnap.id] = {
                     isEmbroidered: d.isEmbroidered === true || d.isEmbroidered === "TRUE" || d.isEmbroidered === "true",
                     isOrdered: d.isOrdered === true || d.isOrdered === "TRUE" || d.isOrdered === "true",
+                    school: d.school,
+                    trainingCenter: d.trainingCenter,
                   };
                 }
               });
@@ -752,28 +754,47 @@ export default function AdminDashboard() {
               }
               return false;
             };
+
+            const getStrValMatch = (rec: any, keys: string[]) => {
+              for (const key of keys) {
+                for (const k of Object.keys(rec)) {
+                   if (k && k.toLowerCase().trim() === key.toLowerCase().trim()) return rec[k];
+                }
+              }
+              for (const k of Object.keys(rec)) {
+                   for (const key of keys) {
+                     if (k && k.includes(key)) return rec[k];
+                   }
+              }
+              return undefined;
+            };
             
-            // 1. Core boolean values from Sheets (Google Sheets is the absolute source of truth)
+            // 1. Core values from Sheets (Google Sheets is the absolute source of truth)
             let isEmbroideredVal = getBoolVal(record, "isEmbroidered");
             let isOrderedVal = getBoolVal(record, "isOrdered");
+            let sheetSchool = getStrValMatch(record, ["school", "โรงเรียน"]);
+            let sheetCenter = getStrValMatch(record, ["trainingCenter", "trainingcenter", "ศูนย์ฝึก", "ศูนย์"]);
             
             // 2. Reconcile Firestore with Google Sheets state ONLY if Firestore states were successfully loaded.
-            // This prevents flooding write operations (setDoc) to a quota-exceeded or offline database on load.
             const fbState = firestoreStates[record.id];
             if (fbState) {
-              if (fbState.isEmbroidered !== isEmbroideredVal) {
-                setDoc(doc(db, "orders", record.id), { isEmbroidered: isEmbroideredVal }, { merge: true }).catch((e) => {
-                  console.warn("Error reconciling isEmbroidered to Firestore:", e);
-                });
-              }
-              if (fbState.isOrdered !== isOrderedVal) {
-                setDoc(doc(db, "orders", record.id), { isOrdered: isOrderedVal }, { merge: true }).catch((e) => {
-                  console.warn("Error reconciling isOrdered to Firestore:", e);
+              const updates: any = {};
+              if (fbState.isEmbroidered !== isEmbroideredVal) updates.isEmbroidered = isEmbroideredVal;
+              if (fbState.isOrdered !== isOrderedVal) updates.isOrdered = isOrderedVal;
+              if (sheetSchool !== undefined && fbState.school !== sheetSchool) updates.school = sheetSchool;
+              if (sheetCenter !== undefined && fbState.trainingCenter !== sheetCenter) updates.trainingCenter = sheetCenter;
+              
+              if (Object.keys(updates).length > 0) {
+                setDoc(doc(db, "orders", record.id), updates, { merge: true }).catch((e) => {
+                  console.warn("Error reconciling to Firestore:", e);
                 });
               }
             } else if (didFetchFS && !isFirestoreQuotaExceeded()) {
-              setDoc(doc(db, "orders", record.id), { isEmbroidered: isEmbroideredVal, isOrdered: isOrderedVal }, { merge: true }).catch((e) => {
-                console.warn("Error syncing initial booleans to Firestore:", e);
+              const updates: any = { isEmbroidered: isEmbroideredVal, isOrdered: isOrderedVal };
+              if (sheetSchool !== undefined) updates.school = sheetSchool;
+              if (sheetCenter !== undefined) updates.trainingCenter = sheetCenter;
+              setDoc(doc(db, "orders", record.id), updates, { merge: true }).catch((e) => {
+                console.warn("Error syncing initial data to Firestore:", e);
               });
             }
 
@@ -803,6 +824,8 @@ export default function AdminDashboard() {
               remarks: foundRemarks,
               isOrdered: isOrderedVal,
               isEmbroidered: isEmbroideredVal,
+              school: sheetSchool !== undefined ? sheetSchool : record.school,
+              trainingCenter: sheetCenter !== undefined ? sheetCenter : record.trainingCenter,
               items,
               _rawItems: rawItemsStr,
               aiVerification,
@@ -5350,9 +5373,9 @@ export default function AdminDashboard() {
                   className="px-4 py-3 bg-army-bg border-2 border-army-bg rounded-xl text-xs font-black uppercase tracking-normal outline-none focus:border-army-dark transition-all"
                 >
                   <option value="all">ทุกศูนย์</option>
-                  {TRAINING_CENTERS.map((center) => (
-                    <option key={center} value={center}>
-                      {center}
+                  {trainingCenters.map((center) => (
+                    <option key={center.id || center.name} value={center.name}>
+                      {center.name}
                     </option>
                   ))}
                 </select>
@@ -5363,11 +5386,13 @@ export default function AdminDashboard() {
                 >
                   <option value="all">ทุกโรงเรียน</option>
                   {filterCenter !== "all" &&
-                    SCHOOLS_BY_CENTER[filterCenter]?.map((school) => (
-                      <option key={school} value={school}>
-                        {school}
-                      </option>
-                    ))}
+                    schools
+                      .filter((s) => s.trainingCenterName === filterCenter)
+                      .map((school) => (
+                        <option key={school.id || school.name} value={school.name}>
+                          {school.name}
+                        </option>
+                      ))}
                 </select>
                 <select
                   value={filterGender}
@@ -5742,9 +5767,9 @@ export default function AdminDashboard() {
                   className="px-4 py-3 bg-army-bg border-2 border-army-bg rounded-xl text-xs font-black uppercase tracking-normal outline-none focus:border-army-dark transition-all"
                 >
                   <option value="all">ทุกศูนย์</option>
-                  {TRAINING_CENTERS.map((center) => (
-                    <option key={center} value={center}>
-                      {center}
+                  {trainingCenters.map((center) => (
+                    <option key={center.id || center.name} value={center.name}>
+                      {center.name}
                     </option>
                   ))}
                 </select>
@@ -5755,11 +5780,13 @@ export default function AdminDashboard() {
                 >
                   <option value="all">ทุกโรงเรียน</option>
                   {filterCenter !== "all" &&
-                    SCHOOLS_BY_CENTER[filterCenter]?.map((school) => (
-                      <option key={school} value={school}>
-                        {school}
-                      </option>
-                    ))}
+                    schools
+                      .filter((s) => s.trainingCenterName === filterCenter)
+                      .map((school) => (
+                        <option key={school.id || school.name} value={school.name}>
+                          {school.name}
+                        </option>
+                      ))}
                 </select>
                 <select
                   value={sortOrder}
