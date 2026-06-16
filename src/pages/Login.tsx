@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { googleSheetService } from '../services/googleSheetService';
 import { ShieldCheck, AlertCircle, Loader2, ArrowRight } from 'lucide-react';
@@ -8,7 +8,16 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [emailInput, setEmailInput] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('rememberedAdminEmail');
+    if (savedEmail) {
+      setEmailInput(savedEmail);
+      setRememberMe(true);
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,10 +33,25 @@ export default function Login() {
       const email = emailInput.trim().toLowerCase();
       console.log('Attempting login for:', email);
 
+      const checkAndProceed = (isAdmin: boolean) => {
+        if (isAdmin) {
+          console.log('Authorized admin, navigating to /admin');
+          localStorage.setItem('adminEmail', email);
+          if (rememberMe) {
+            localStorage.setItem('rememberedAdminEmail', email);
+          } else {
+            localStorage.removeItem('rememberedAdminEmail');
+          }
+          navigate('/admin');
+        } else {
+          console.log('Unauthorized email:', email);
+          setError('ปฏิเสธการเข้าถึง: อีเมลนี้ไม่ได้รับสิทธิ์ผู้ดูแลระบบ');
+        }
+      }
+
       if (email === 'masterball.dbs@gmail.com' || email.startsWith('admin_')) {
         console.log('Authorized by default, navigating to /admin');
-        localStorage.setItem('adminEmail', email);
-        navigate('/admin');
+        checkAndProceed(true);
         return;
       }
 
@@ -46,14 +70,7 @@ export default function Login() {
         throw new Error('ไม่สามารถตรวจสอบข้อมูลกับ Google Sheets ได้');
       }
 
-      if (isUserAdmin) {
-        console.log('Authorized admin, navigating to /admin');
-        localStorage.setItem('adminEmail', email);
-        navigate('/admin');
-      } else {
-        console.log('Unauthorized email:', email);
-        setError('ปฏิเสธการเข้าถึง: อีเมลนี้ไม่ได้รับสิทธิ์ผู้ดูแลระบบ');
-      }
+      checkAndProceed(isUserAdmin);
     } catch (err: any) {
       console.error('Login error:', err);
       setError(err.message || 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ');
@@ -101,6 +118,19 @@ export default function Login() {
               disabled={loading}
               required
             />
+            <div className="mt-4 flex items-center">
+              <input
+                type="checkbox"
+                id="rememberMe"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-5 h-5 text-army-primary border-gray-300 rounded focus:ring-army-primary"
+                disabled={loading}
+              />
+              <label htmlFor="rememberMe" className="ml-2 block text-sm font-bold text-army-dark">
+                จดจำอีเมลในเครื่องนี้
+              </label>
+            </div>
           </div>
 
           <button
