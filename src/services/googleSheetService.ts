@@ -308,7 +308,9 @@ export const googleSheetService = {
    * Fetch all records from a sheet via high-speed server side caching daemon
    */
   async fetchRecords(sheet: SheetName) {
-    if (!SCRIPT_URL) return [];
+    if (!SCRIPT_URL) {
+      throw new Error('VITE_GOOGLE_SHEET_URL is not defined');
+    }
 
     try {
       // Use the ultra-fast backend aggregator if local

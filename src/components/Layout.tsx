@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { User, LayoutDashboard, LogOut, Menu, X, Package, Home } from 'lucide-react';
-import { auth, db, isFirestoreQuotaExceeded } from '../firebase';
 import { googleSheetService } from '../services/googleSheetService';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -13,42 +11,27 @@ interface LayoutProps {
 }
 
 export default function Layout({ children, cartCount }: LayoutProps) {
-  const [user, setUser] = useState(auth.currentUser);
+  const [adminEmail, setAdminEmail] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      setUser(u);
-      if (u) {
-        if (u.email === 'masterball.dbs@gmail.com' || u.email?.startsWith('admin_')) {
-          setIsAdmin(true);
-        } else {
-          try {
-            // Sheets
-            const sheetAdmins = await googleSheetService.fetchRecords('Admins');
-            const foundAdmin = sheetAdmins.find((a: any) => a.email === u.email || a.id === u.email);
-            if (foundAdmin) {
-              setIsAdmin(true);
-            } else {
-              setIsAdmin(false);
-            }
-          } catch (error) {
-            console.warn('Checks failed:', error);
-            setIsAdmin(false);
-          }
-        }
-      } else {
-        setIsAdmin(false);
-      }
-    });
-    return () => unsubscribe();
-  }, []);
+    const email = localStorage.getItem('adminEmail');
+    if (email) {
+      setAdminEmail(email);
+      setIsAdmin(true);
+    } else {
+      setAdminEmail(null);
+      setIsAdmin(false);
+    }
+  }, [location.pathname]); // check when route changes so state updates
 
   const handleLogout = async () => {
-    await signOut(auth);
+    localStorage.removeItem('adminEmail');
+    setAdminEmail(null);
+    setIsAdmin(false);
     navigate('/');
   };
 
@@ -118,17 +101,17 @@ export default function Layout({ children, cartCount }: LayoutProps) {
                 )}
               </Link>
 
-              {user ? (
+              {isAdmin ? (
                 <div className="flex items-center space-x-1 sm:space-x-4 bg-army-bg p-0.5 sm:p-1 rounded-xl sm:rounded-2xl border-2 border-army-light/10">
                   <div className="w-7 h-7 sm:w-10 sm:h-10 bg-white rounded-lg sm:rounded-xl flex-shrink-0 flex items-center justify-center text-army-primary border-2 border-army-light/20 shadow-sm">
                     <User size={14} className="sm:w-5 sm:h-5" />
                   </div>
                   <div className="hidden sm:block text-left">
                     <p className="text-[10px] sm:text-sm font-black text-army-dark uppercase tracking-tight truncate max-w-[60px] md:max-w-[120px]">
-                      {user.displayName || user.email?.split('@')[0]}
+                      {adminEmail?.split('@')[0]}
                     </p>
                     <p className="text-[8px] sm:text-xs font-black text-army-muted uppercase tracking-widest">
-                      {isAdmin ? 'ผู้ดูแลระบบ' : 'กำลังพล'}
+                      ผู้ดูแลระบบ
                     </p>
                   </div>
                   <button
@@ -146,7 +129,7 @@ export default function Layout({ children, cartCount }: LayoutProps) {
                 >
                   <User size={14} className="sm:w-4.5 sm:h-4.5" />
                   <span className="hidden sm:block">เข้าสู่ระบบ</span>
-                  <span className="block sm:hidden">เข้าสู่ระบบ</span>
+                  <span className="block sm:hidden">เข้าระบบ</span>
                 </Link>
               )}
 

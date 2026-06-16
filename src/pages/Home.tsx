@@ -122,6 +122,10 @@ export default function Home({ onAddToCart }: HomeProps) {
         const fixPrices = (list: any[]) =>
           list.map((p) => ({ ...p, price: fixProductPrice(p.name, p.price) }));
 
+        if (prods.length === 0) {
+          throw new Error("No products found from Sheets, falling back to initial data.");
+        }
+
         if (isMounted) {
           setProducts(fixPrices(prods) as Product[]);
           try {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 
-import { auth, db, isFirestoreQuotaExceeded, handleFirestoreError, OperationType } from "../firebase";
+import { db, isFirestoreQuotaExceeded, handleFirestoreError, OperationType } from "../firebase";
 import { doc, setDoc, collection, getDocsFromServer } from "firebase/firestore";
 import {
   Order,
@@ -60,7 +60,6 @@ import { motion, AnimatePresence } from "motion/react";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { onAuthStateChanged, signOut } from "firebase/auth";
 import {
   LineChart,
   Line,
@@ -642,13 +641,14 @@ export default function AdminDashboard() {
   // Auto-sync school addresses on load if missing
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
+    const checkAuth = async () => {
+      const adminEmail = localStorage.getItem("adminEmail");
+      if (!adminEmail) {
         navigate("/login");
         return;
       }
 
-      const email = user.email;
+      const email = adminEmail.toLowerCase();
       if (email === "masterball.dbs@gmail.com" || email?.startsWith("admin_")) {
         return;
       }
@@ -657,16 +657,20 @@ export default function AdminDashboard() {
       try {
         const sheetAdmins = await googleSheetService.fetchRecords("Admins");
         const foundAdmin = sheetAdmins.find(
-          (a: any) => a.email === email || a.id === email,
+          (a: any) => 
+            (a.email && a.email.toLowerCase() === email) || 
+            (a.id && a.id.toLowerCase() === email)
         );
         if (!foundAdmin) {
           console.log("Unauthorized email refresh:", email);
+          localStorage.removeItem("adminEmail");
           navigate("/login");
         }
       } catch (error) {
         console.error("Check admin error from Sheets:", error);
       }
-    });
+    };
+    checkAuth();
 
     let isMounted = true;
     const fetchOrders = async (showLoading = true) => {
@@ -990,7 +994,6 @@ export default function AdminDashboard() {
     fetchSettings();
 
     return () => {
-      unsubscribeAuth();
       unsubscribeOrders();
     };
   }, [navigate, refreshTrigger]);
@@ -1390,7 +1393,7 @@ export default function AdminDashboard() {
   };
 
   const handleLogout = async () => {
-    await signOut(auth);
+    localStorage.removeItem("adminEmail");
     navigate("/");
   };
 

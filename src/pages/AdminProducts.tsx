@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db, handleFirestoreError, OperationType, auth } from '../firebase';
+import { db, handleFirestoreError, OperationType } from '../firebase';
 import { Product } from '../types';
 import { googleSheetService } from '../services/googleSheetService';
 import { formatPrice, cn, parseSizes, fixProductPrice } from '../lib/utils';
@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { INITIAL_PRODUCTS } from '../data/initialProducts';
 
 const CATEGORIES = ['ชุดฝึก/เครื่องแบบ', 'รองเท้าจังเกิ้ลหนังแท้สีดำ', 'อุปกรณ์สนาม'];
@@ -74,18 +73,13 @@ export default function AdminProducts() {
   };
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        navigate('/login');
-        return;
-      }
-    });
+    const adminEmail = localStorage.getItem('adminEmail');
+    if (!adminEmail) {
+      navigate('/login');
+      return;
+    }
 
     fetchProducts();
-
-    return () => {
-      unsubscribeAuth();
-    };
   }, [navigate]);
 
   const handleOpenModal = (product?: Product) => {
@@ -177,7 +171,7 @@ export default function AdminProducts() {
   );
 
   const handleLogout = async () => {
-    await signOut(auth);
+    localStorage.removeItem('adminEmail');
     navigate('/');
   };
 
