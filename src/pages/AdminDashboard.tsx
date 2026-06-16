@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import imageCompression from "browser-image-compression";
 
 import { db, isFirestoreQuotaExceeded, handleFirestoreError, OperationType } from "../firebase";
 import { doc, setDoc, collection, getDocsFromServer } from "firebase/firestore";
@@ -291,6 +292,51 @@ export default function AdminDashboard() {
       }
     } catch (error) {
       console.error(error);
+    }
+  };
+
+  const [uploadingSlipId, setUploadingSlipId] = useState<string | null>(null);
+
+  const handleAdminUploadSlip = async (orderId: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      setUploadingSlipId(orderId);
+      triggerToast('กำลังอัปโหลดสลิป...', 'info');
+
+      // Compression settings (similar to Checkout.tsx)
+      const options = {
+        maxSizeMB: 0.2, // Max 200KB limit
+        maxWidthOrHeight: 800,
+        useWebWorker: true,
+        initialQuality: 0.7
+      };
+      
+      const compressedFile = await imageCompression(file, options);
+      const base64data = await imageCompression.getDataUrlFromFile(compressedFile);
+
+      // Update in Firestore
+      const orderRef = doc(db, 'orders', orderId);
+      await setDoc(orderRef, { slipUrl: base64data }, { merge: true });
+
+      // Update local state by mutating the orders array so the UI reflects the change immediately
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, slipUrl: base64data } : o));
+
+      // Also update selectedOrder if it is currently open
+      if (selectedOrder && selectedOrder.id === orderId) {
+        setSelectedOrder(prev => prev ? { ...prev, slipUrl: base64data } : null);
+      }
+
+      triggerToast('อัปโหลดสลิปเรียบร้อยแล้ว', 'success');
+    } catch (error) {
+      console.error('Error uploading slip:', error);
+      triggerToast('เกิดข้อผิดพลาดในการอัปโหลดสลิป โปรดลองอีกครั้ง', 'error');
+    } finally {
+      if (event.target) {
+         event.target.value = ''; // Reset input to allow picking the same file again
+      }
+      setUploadingSlipId(null);
     }
   };
 
@@ -2392,7 +2438,7 @@ export default function AdminDashboard() {
                           <td>${chunk.startIndex + i + 1}</td>
                           <td>${center}</td>
                           <td style="white-space: normal;">${school.replace(/วิทยา/g, '<br/>วิทยา')}</td>
-                          <td>${o.fullName}</td>
+                          <td>${o.fullName} ${(o.gender === 'ชาย' || o.gender === 'ช' || o.gender?.toLowerCase() === 'male' || o.gender?.toLowerCase() === 'm') ? '(ช)' : (o.gender === 'หญิง' || o.gender === 'ญ' || o.gender?.toLowerCase() === 'female' || o.gender?.toLowerCase() === 'f') ? '(ญ)' : ''}</td>
                           <td><div>${sortOrderItemsBySize(o.items).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
                           <td>${formatPrice(getOrderAmount(o))}</td>
                         </tr>
@@ -2435,7 +2481,7 @@ export default function AdminDashboard() {
                           <td>${chunk.startIndex + i + 1}</td>
                           <td>${center}</td>
                           <td style="white-space: normal;">${school.replace(/วิทยา/g, '<br/>วิทยา')}</td>
-                          <td>${o.fullName}</td>
+                          <td>${o.fullName} ${(o.gender === 'ชาย' || o.gender === 'ช' || o.gender?.toLowerCase() === 'male' || o.gender?.toLowerCase() === 'm') ? '(ช)' : (o.gender === 'หญิง' || o.gender === 'ญ' || o.gender?.toLowerCase() === 'female' || o.gender?.toLowerCase() === 'f') ? '(ญ)' : ''}</td>
                           <td><div>${sortOrderItemsBySize(o.items).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
                           <td>${formatPrice(getOrderAmount(o))}</td>
                         </tr>
@@ -2502,7 +2548,7 @@ export default function AdminDashboard() {
                           (o: any, i: number) => `
                         <tr>
                           <td>${chunk.startIndex + i + 1}</td>
-                          <td>${o.fullName}</td>
+                          <td>${o.fullName} ${(o.gender === 'ชาย' || o.gender === 'ช' || o.gender?.toLowerCase() === 'male' || o.gender?.toLowerCase() === 'm') ? '(ช)' : (o.gender === 'หญิง' || o.gender === 'ญ' || o.gender?.toLowerCase() === 'female' || o.gender?.toLowerCase() === 'f') ? '(ญ)' : ''}</td>
                           <td>${o.trainingCenter}</td>
                           <td><div>${sortOrderItemsBySize(o.items).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
                           <td>${formatPrice(getOrderAmount(o))}</td>
@@ -2543,7 +2589,7 @@ export default function AdminDashboard() {
                           (o: any, i: number) => `
                         <tr>
                           <td>${chunk.startIndex + i + 1}</td>
-                          <td>${o.fullName}</td>
+                          <td>${o.fullName} ${(o.gender === 'ชาย' || o.gender === 'ช' || o.gender?.toLowerCase() === 'male' || o.gender?.toLowerCase() === 'm') ? '(ช)' : (o.gender === 'หญิง' || o.gender === 'ญ' || o.gender?.toLowerCase() === 'female' || o.gender?.toLowerCase() === 'f') ? '(ญ)' : ''}</td>
                           <td>${o.trainingCenter}</td>
                           <td><div>${sortOrderItemsBySize(o.items).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
                           <td>${formatPrice(getOrderAmount(o))}</td>
@@ -2607,7 +2653,7 @@ export default function AdminDashboard() {
                           (o: any, i: number) => `
                         <tr>
                           <td>${chunk.startIndex + i + 1}</td>
-                          <td>${o.fullName}</td>
+                          <td>${o.fullName} ${(o.gender === 'ชาย' || o.gender === 'ช' || o.gender?.toLowerCase() === 'male' || o.gender?.toLowerCase() === 'm') ? '(ช)' : (o.gender === 'หญิง' || o.gender === 'ญ' || o.gender?.toLowerCase() === 'female' || o.gender?.toLowerCase() === 'f') ? '(ญ)' : ''}</td>
                           <td>${o.trainingCenter}</td>
                           <td><div>${sortOrderItemsBySize(o.items).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
                           <td>${formatPrice(getOrderAmount(o))}</td>
@@ -2648,7 +2694,7 @@ export default function AdminDashboard() {
                           (o: any, i: number) => `
                         <tr>
                           <td>${chunk.startIndex + i + 1}</td>
-                          <td>${o.fullName}</td>
+                          <td>${o.fullName} ${(o.gender === 'ชาย' || o.gender === 'ช' || o.gender?.toLowerCase() === 'male' || o.gender?.toLowerCase() === 'm') ? '(ช)' : (o.gender === 'หญิง' || o.gender === 'ญ' || o.gender?.toLowerCase() === 'female' || o.gender?.toLowerCase() === 'f') ? '(ญ)' : ''}</td>
                           <td>${o.trainingCenter}</td>
                           <td><div>${sortOrderItemsBySize(o.items).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
                           <td>${formatPrice(getOrderAmount(o))}</td>
@@ -2706,7 +2752,7 @@ export default function AdminDashboard() {
                     (o: any, i: number) => `
                   <tr>
                     <td>${chunk.startIndex + i + 1}</td>
-                    <td>${o.fullName}</td>
+                    <td>${o.fullName} ${(o.gender === 'ชาย' || o.gender === 'ช' || o.gender?.toLowerCase() === 'male' || o.gender?.toLowerCase() === 'm') ? '(ช)' : (o.gender === 'หญิง' || o.gender === 'ญ' || o.gender?.toLowerCase() === 'female' || o.gender?.toLowerCase() === 'f') ? '(ญ)' : ''}</td>
                     <td>${o.trainingCenter}</td>
                     <td><div>${sortOrderItemsBySize(o.items).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
                     <td>${formatPrice(getOrderAmount(o))}</td>
@@ -2855,7 +2901,7 @@ export default function AdminDashboard() {
                       <tr>
                         <td>${chunk.startIndex + i + 1}</td>
                         <td>${o.id.slice(0, 8).toUpperCase()}</td>
-                        <td>${o.fullName}</td>
+                        <td>${o.fullName} ${(o.gender === 'ชาย' || o.gender === 'ช' || o.gender?.toLowerCase() === 'male' || o.gender?.toLowerCase() === 'm') ? '(ช)' : (o.gender === 'หญิง' || o.gender === 'ญ' || o.gender?.toLowerCase() === 'female' || o.gender?.toLowerCase() === 'f') ? '(ญ)' : ''}</td>
                         <td><div>${sortOrderItemsBySize(o.items).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
                         <td>${formatPrice(getOrderAmount(o))}</td>
                         <td>${STATUS_CONFIG[o.status]?.label || o.status}</td>
@@ -2898,7 +2944,7 @@ export default function AdminDashboard() {
                       <tr>
                         <td>${chunk.startIndex + i + 1}</td>
                         <td>${o.id.slice(0, 8).toUpperCase()}</td>
-                        <td>${o.fullName}</td>
+                        <td>${o.fullName} ${(o.gender === 'ชาย' || o.gender === 'ช' || o.gender?.toLowerCase() === 'male' || o.gender?.toLowerCase() === 'm') ? '(ช)' : (o.gender === 'หญิง' || o.gender === 'ญ' || o.gender?.toLowerCase() === 'female' || o.gender?.toLowerCase() === 'f') ? '(ญ)' : ''}</td>
                         <td><div>${sortOrderItemsBySize(o.items).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
                         <td>${formatPrice(getOrderAmount(o))}</td>
                         <td>${STATUS_CONFIG[o.status]?.label || o.status}</td>
@@ -3747,7 +3793,7 @@ export default function AdminDashboard() {
                       return `
                   <tr style="background-color: ${idx % 2 === 1 ? "#f8faf9" : "white"}; page-break-inside: avoid;">
                     <td style="border: 1px solid #cad4cf; padding: 6px 4px; text-align: center;">${absoluteIdx}</td>
-                    <td style="border: 1px solid #cad4cf; padding: 6px 10px; font-weight: bold; font-size: 12px; text-align: left;">${o.fullName}</td>
+                    <td style="border: 1px solid #cad4cf; padding: 6px 10px; font-weight: bold; font-size: 12px; text-align: left;">${o.fullName} ${(o.gender === 'ชาย' || o.gender === 'ช' || o.gender?.toLowerCase() === 'male' || o.gender?.toLowerCase() === 'm') ? '(ช)' : (o.gender === 'หญิง' || o.gender === 'ญ' || o.gender?.toLowerCase() === 'female' || o.gender?.toLowerCase() === 'f') ? '(ญ)' : ''}</td>
                     <td style="border: 1px solid #cad4cf; padding: 6px 4px; text-align: center;">${o.year || "-"}</td>
                     <td style="border: 1px solid #cad4cf; padding: 6px 4px; text-align: center;">${o.gender || "-"}</td>
                     <td style="border: 1px solid #cad4cf; padding: 6px 4px; text-align: center;">${o.phone || "-"}</td>
@@ -5984,17 +6030,32 @@ export default function AdminDashboard() {
                                   recoveredSlips[order.id];
                                 if (!slipContent) {
                                   return (
-                                    <button
-                                      disabled
-                                      className="flex flex-col items-center justify-center px-2 py-1.5 rounded-lg border transition-all shadow-sm whitespace-nowrap bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed w-full"
-                                    >
-                                      <div className="flex items-center space-x-1">
-                                        <Eye size={14} />
-                                        <span className="text-[10px] font-black">
-                                          ไม่มีสลิป
-                                        </span>
-                                      </div>
-                                    </button>
+                                    <div className="relative">
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        id={`upload-slip-${order.id}`}
+                                        className="hidden"
+                                        onChange={(e) => handleAdminUploadSlip(order.id, e)}
+                                      />
+                                      <label
+                                        htmlFor={`upload-slip-${order.id}`}
+                                        className="flex flex-col items-center justify-center px-2 py-1.5 rounded-lg border transition-all shadow-sm whitespace-nowrap bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 w-full cursor-pointer"
+                                      >
+                                        <div className="flex items-center space-x-1">
+                                          {uploadingSlipId === order.id ? (
+                                             <span className="text-[10px] font-black animate-pulse">กำลังอัปโหลด...</span>
+                                          ) : (
+                                            <>
+                                              <Upload size={14} />
+                                              <span className="text-[10px] font-black">
+                                                เพิ่มสลิป
+                                              </span>
+                                            </>
+                                          )}
+                                        </div>
+                                      </label>
+                                    </div>
                                   );
                                 }
                                 const isDuplicate =
@@ -7143,16 +7204,29 @@ export default function AdminDashboard() {
                             recoveredSlips[selectedOrder.id];
                           if (!slipContent) {
                             return (
-                              <div className="flex flex-col gap-2 mt-4">
-                                <button
-                                  disabled
-                                  className="inline-flex items-center justify-center space-x-2 p-3 rounded-xl transition-all w-full shadow-md bg-gray-200 text-gray-500 shadow-gray-200/20 cursor-not-allowed"
+                              <div className="flex flex-col gap-2 mt-4 relative">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  id={`upload-slip-drawer-${selectedOrder.id}`}
+                                  className="hidden"
+                                  onChange={(e) => handleAdminUploadSlip(selectedOrder.id, e)}
+                                />
+                                <label
+                                  htmlFor={`upload-slip-drawer-${selectedOrder.id}`}
+                                  className="inline-flex items-center justify-center space-x-2 p-3 rounded-xl transition-all w-full shadow-md bg-blue-50 text-blue-600 shadow-blue-500/20 hover:bg-blue-100 cursor-pointer"
                                 >
-                                  <Eye size={16} />
-                                  <span className="font-bold whitespace-normal text-center text-xs">
-                                    ไม่มีรูปสลิปโอนเงิน (ไม่ได้แนบมา)
-                                  </span>
-                                </button>
+                                  {uploadingSlipId === selectedOrder.id ? (
+                                    <span className="font-bold whitespace-normal text-center text-xs animate-pulse">กำลังอัปโหลด...</span>
+                                  ) : (
+                                    <>
+                                      <Upload size={16} />
+                                      <span className="font-bold whitespace-normal text-center text-xs">
+                                        คลิกเพื่ออัปโหลดสลิป
+                                      </span>
+                                    </>
+                                  )}
+                                </label>
                               </div>
                             );
                           }
