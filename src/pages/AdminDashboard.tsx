@@ -1537,7 +1537,7 @@ export default function AdminDashboard() {
         const d = order.createdAt?.toDate ? order.createdAt.toDate() : new Date(order.createdAt);
         dateStr = format(d, "dd/MM/yyyy HH:mm");
       } catch(e) {}
-      const itemsStr = order.items
+      const itemsStr = sortOrderItemsBySize(getFilteredItems(order.items))
         .map((item) => `${item.name} (${formatItemSize(item.name, item.size)}) x${item.quantity}`)
         .join(" | ");
       const statusLabel =
@@ -1579,6 +1579,15 @@ export default function AdminDashboard() {
     );
   };
 
+  
+  const getFilteredItems = (items: OrderItem[]) => {
+    return items.filter(item => {
+      const pMatch = filterProduct === "all" || item.name === filterProduct;
+      const sMatch = filterSize === "all" || item.size === filterSize;
+      return pMatch && sMatch;
+    });
+  };
+
   const filteredOrders = orders
     .filter((o) => {
       const matchesStatus = filterStatus === "all" || o.status === filterStatus;
@@ -1589,12 +1598,11 @@ export default function AdminDashboard() {
         filterCenter === "all" || o.trainingCenter === filterCenter;
       const matchesSchool = filterSchool === "all" || o.school === filterSchool;
       const matchesGender = filterGender === "all" || o.gender === filterGender;
-      const matchesProduct =
-        filterProduct === "all" ||
-        o.items.some((item) => item.name === filterProduct);
-      const matchesSize =
-        filterSize === "all" ||
-        o.items.some((item) => item.size === filterSize);
+      const hasMatchingItem = o.items.some((item) => {
+        const pMatch = filterProduct === "all" || item.name === filterProduct;
+        const sMatch = filterSize === "all" || item.size === filterSize;
+        return pMatch && sMatch;
+      });
       const matchesDate = !filterDate ? true : (() => {
         try {
           const dateToCompare = o.createdAt?.toDate ? o.createdAt.toDate() : new Date(o.createdAt);
@@ -1609,8 +1617,7 @@ export default function AdminDashboard() {
         matchesCenter &&
         matchesSchool &&
         matchesGender &&
-        matchesProduct &&
-        matchesSize &&
+        hasMatchingItem &&
         matchesDate
       );
     })
@@ -2439,7 +2446,7 @@ export default function AdminDashboard() {
                           <td>${center}</td>
                           <td style="white-space: normal;">${school.replace(/วิทยา/g, '<br/>วิทยา')}</td>
                           <td>${o.fullName} ${(o.gender === 'ชาย' || o.gender === 'ช' || o.gender?.toLowerCase() === 'male' || o.gender?.toLowerCase() === 'm') ? '(ช)' : (o.gender === 'หญิง' || o.gender === 'ญ' || o.gender?.toLowerCase() === 'female' || o.gender?.toLowerCase() === 'f') ? '(ญ)' : ''}</td>
-                          <td><div>${sortOrderItemsBySize(o.items).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
+                          <td><div>${sortOrderItemsBySize(getFilteredItems(o.items)).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
                           <td>${formatPrice(getOrderAmount(o))}</td>
                         </tr>
                       `,
@@ -2482,7 +2489,7 @@ export default function AdminDashboard() {
                           <td>${center}</td>
                           <td style="white-space: normal;">${school.replace(/วิทยา/g, '<br/>วิทยา')}</td>
                           <td>${o.fullName} ${(o.gender === 'ชาย' || o.gender === 'ช' || o.gender?.toLowerCase() === 'male' || o.gender?.toLowerCase() === 'm') ? '(ช)' : (o.gender === 'หญิง' || o.gender === 'ญ' || o.gender?.toLowerCase() === 'female' || o.gender?.toLowerCase() === 'f') ? '(ญ)' : ''}</td>
-                          <td><div>${sortOrderItemsBySize(o.items).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
+                          <td><div>${sortOrderItemsBySize(getFilteredItems(o.items)).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
                           <td>${formatPrice(getOrderAmount(o))}</td>
                         </tr>
                       `,
@@ -2550,7 +2557,7 @@ export default function AdminDashboard() {
                           <td>${chunk.startIndex + i + 1}</td>
                           <td>${o.fullName} ${(o.gender === 'ชาย' || o.gender === 'ช' || o.gender?.toLowerCase() === 'male' || o.gender?.toLowerCase() === 'm') ? '(ช)' : (o.gender === 'หญิง' || o.gender === 'ญ' || o.gender?.toLowerCase() === 'female' || o.gender?.toLowerCase() === 'f') ? '(ญ)' : ''}</td>
                           <td>${o.trainingCenter}</td>
-                          <td><div>${sortOrderItemsBySize(o.items).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
+                          <td><div>${sortOrderItemsBySize(getFilteredItems(o.items)).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
                           <td>${formatPrice(getOrderAmount(o))}</td>
                         </tr>
                       `,
@@ -2591,7 +2598,7 @@ export default function AdminDashboard() {
                           <td>${chunk.startIndex + i + 1}</td>
                           <td>${o.fullName} ${(o.gender === 'ชาย' || o.gender === 'ช' || o.gender?.toLowerCase() === 'male' || o.gender?.toLowerCase() === 'm') ? '(ช)' : (o.gender === 'หญิง' || o.gender === 'ญ' || o.gender?.toLowerCase() === 'female' || o.gender?.toLowerCase() === 'f') ? '(ญ)' : ''}</td>
                           <td>${o.trainingCenter}</td>
-                          <td><div>${sortOrderItemsBySize(o.items).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
+                          <td><div>${sortOrderItemsBySize(getFilteredItems(o.items)).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
                           <td>${formatPrice(getOrderAmount(o))}</td>
                         </tr>
                       `,
@@ -2655,7 +2662,7 @@ export default function AdminDashboard() {
                           <td>${chunk.startIndex + i + 1}</td>
                           <td>${o.fullName} ${(o.gender === 'ชาย' || o.gender === 'ช' || o.gender?.toLowerCase() === 'male' || o.gender?.toLowerCase() === 'm') ? '(ช)' : (o.gender === 'หญิง' || o.gender === 'ญ' || o.gender?.toLowerCase() === 'female' || o.gender?.toLowerCase() === 'f') ? '(ญ)' : ''}</td>
                           <td>${o.trainingCenter}</td>
-                          <td><div>${sortOrderItemsBySize(o.items).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
+                          <td><div>${sortOrderItemsBySize(getFilteredItems(o.items)).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
                           <td>${formatPrice(getOrderAmount(o))}</td>
                         </tr>
                       `,
@@ -2696,7 +2703,7 @@ export default function AdminDashboard() {
                           <td>${chunk.startIndex + i + 1}</td>
                           <td>${o.fullName} ${(o.gender === 'ชาย' || o.gender === 'ช' || o.gender?.toLowerCase() === 'male' || o.gender?.toLowerCase() === 'm') ? '(ช)' : (o.gender === 'หญิง' || o.gender === 'ญ' || o.gender?.toLowerCase() === 'female' || o.gender?.toLowerCase() === 'f') ? '(ญ)' : ''}</td>
                           <td>${o.trainingCenter}</td>
-                          <td><div>${sortOrderItemsBySize(o.items).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
+                          <td><div>${sortOrderItemsBySize(getFilteredItems(o.items)).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
                           <td>${formatPrice(getOrderAmount(o))}</td>
                         </tr>
                       `,
@@ -2754,7 +2761,7 @@ export default function AdminDashboard() {
                     <td>${chunk.startIndex + i + 1}</td>
                     <td>${o.fullName} ${(o.gender === 'ชาย' || o.gender === 'ช' || o.gender?.toLowerCase() === 'male' || o.gender?.toLowerCase() === 'm') ? '(ช)' : (o.gender === 'หญิง' || o.gender === 'ญ' || o.gender?.toLowerCase() === 'female' || o.gender?.toLowerCase() === 'f') ? '(ญ)' : ''}</td>
                     <td>${o.trainingCenter}</td>
-                    <td><div>${sortOrderItemsBySize(o.items).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
+                    <td><div>${sortOrderItemsBySize(getFilteredItems(o.items)).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
                     <td>${formatPrice(getOrderAmount(o))}</td>
                   </tr>
                 `,
@@ -2775,7 +2782,7 @@ export default function AdminDashboard() {
         const productSummary: any = {};
         
         filteredOrders.forEach((order) => {
-          (order.items || []).forEach((item) => {
+          (getFilteredItems(order.items || [])).forEach((item) => {
             const normalizedName = item.name.trim().replace(/\s+/g, ' ');
             const filterKey = `${normalizedName} (${formatItemSize(item.name, item.size)})`;
             if (filterItems && filterItems.size > 0 && !filterItems.has(filterKey))
@@ -2902,7 +2909,7 @@ export default function AdminDashboard() {
                         <td>${chunk.startIndex + i + 1}</td>
                         <td>${o.id.slice(0, 8).toUpperCase()}</td>
                         <td>${o.fullName} ${(o.gender === 'ชาย' || o.gender === 'ช' || o.gender?.toLowerCase() === 'male' || o.gender?.toLowerCase() === 'm') ? '(ช)' : (o.gender === 'หญิง' || o.gender === 'ญ' || o.gender?.toLowerCase() === 'female' || o.gender?.toLowerCase() === 'f') ? '(ญ)' : ''}</td>
-                        <td><div>${sortOrderItemsBySize(o.items).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
+                        <td><div>${sortOrderItemsBySize(getFilteredItems(o.items)).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
                         <td>${formatPrice(getOrderAmount(o))}</td>
                         <td>${STATUS_CONFIG[o.status]?.label || o.status}</td>
                       </tr>
@@ -2945,7 +2952,7 @@ export default function AdminDashboard() {
                         <td>${chunk.startIndex + i + 1}</td>
                         <td>${o.id.slice(0, 8).toUpperCase()}</td>
                         <td>${o.fullName} ${(o.gender === 'ชาย' || o.gender === 'ช' || o.gender?.toLowerCase() === 'male' || o.gender?.toLowerCase() === 'm') ? '(ช)' : (o.gender === 'หญิง' || o.gender === 'ญ' || o.gender?.toLowerCase() === 'female' || o.gender?.toLowerCase() === 'f') ? '(ญ)' : ''}</td>
-                        <td><div>${sortOrderItemsBySize(o.items).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
+                        <td><div>${sortOrderItemsBySize(getFilteredItems(o.items)).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
                         <td>${formatPrice(getOrderAmount(o))}</td>
                         <td>${STATUS_CONFIG[o.status]?.label || o.status}</td>
                       </tr>
