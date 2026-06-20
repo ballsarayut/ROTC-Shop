@@ -309,7 +309,7 @@ export default function AdminDashboard() {
       const options = {
         maxSizeMB: 0.2, // Max 200KB limit
         maxWidthOrHeight: 800,
-        useWebWorker: true,
+        useWebWorker: false, // Compatibility with some browsers
         initialQuality: 0.7
       };
       

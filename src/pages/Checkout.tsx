@@ -219,16 +219,16 @@ export default function Checkout({ cart, paymentSettingsProp, onClearCart }: Che
           const options = {
             maxSizeMB: 0.2, // Max 200KB to fit easily in Firestore docs
             maxWidthOrHeight: 800,
-            useWebWorker: true,
+            useWebWorker: false, // false for compatibility with LINE in-app browser
             initialQuality: 0.7
           };
           const compressedFile = await imageCompression(slipFile, options);
           const base64data = await imageCompression.getDataUrlFromFile(compressedFile);
           slipUrl = base64data; // Store base64 directly
           slipBase64 = base64data.split(',')[1] || '';
-        } catch (uploadError) {
+        } catch (uploadError: any) {
           console.error("Slip compression error:", uploadError);
-          throw new Error("Cannot process image format. Please try another image."); 
+          throw new Error(`Cannot process image format: ${uploadError?.message || 'Unknown error'}. Please try another image.`); 
         }
       }
 
@@ -290,7 +290,7 @@ export default function Checkout({ cart, paymentSettingsProp, onClearCart }: Che
       
       let errorMessage = 'ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง';
       if (error.message?.includes('process image format')) {
-        errorMessage = 'ไม่สามารถประมวลผลรูปภาพได้ กรุณาใช้ไฟล์ .jpg หรือ .png';
+        errorMessage = `ไม่สามารถประมวลผลรูปภาพได้ กรุณาใช้ไฟล์ .jpg หรือ .png (${error.message})`;
       } else if (error.message?.includes('Database timeout') || error.message?.includes('permission-denied')) {
         errorMessage = 'ไม่สามารถบันทึกข้อมูลลงฐานข้อมูลได้ (อาจเป็นเพราะข้อจำกัดสิทธิ์ / Permission Denied)';
       } else if (error.message) {
