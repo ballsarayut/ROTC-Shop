@@ -8,6 +8,8 @@ const SCRIPT_URL = import.meta.env.VITE_GOOGLE_SHEET_URL || "https://script.goog
 
 export type SheetName = 'Orders' | 'Products' | 'Settings' | 'Admins' | 'Schools' | 'TrainingCenters';
 
+export const getGoogleSheetUrl = () => SCRIPT_URL;
+
 export const googleSheetService = {
   /**
    * Sync a single record to Google Sheets (Create or Update)

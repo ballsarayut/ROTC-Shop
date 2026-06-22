@@ -11,7 +11,7 @@ import {
   OrderItem,
 } from "../types";
 import { verifySlipImage } from "../services/geminiService";
-import { googleSheetService } from "../services/googleSheetService";
+import { googleSheetService, getGoogleSheetUrl } from "../services/googleSheetService";
 import { formatPrice, cn, parseSizes, getOrderAmount, formatItemSize } from "../lib/utils";
 import {
   LayoutDashboard,
@@ -5433,6 +5433,9 @@ export default function AdminDashboard() {
                 <p className="text-emerald-700 text-sm mt-0.5">
                   ระบบจัดเตรียมฐานข้อมูลสำรองและทำงานประสานข้อมูลร่วมกับ Google Sheets ครบถ้วนรวดเร็ว 100%
                 </p>
+                <div className="mt-2 text-xs text-emerald-600 bg-emerald-100/50 p-2 rounded break-all font-mono">
+                  URL: {getGoogleSheetUrl() || "Loading..."}
+                </div>
               </div>
             </div>
           </div>
