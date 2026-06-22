@@ -954,9 +954,7 @@ export default function AdminDashboard() {
         if (!isMounted) return;
         const msg = error instanceof Error ? error.message : String(error);
         console.error("Orders fetch error from Sheets:", msg);
-        if (msg.includes("VITE_GOOGLE_SHEET_URL")) {
-          triggerToast("การเชื่อมต่อ Apps Script ผิดพลาด กรุณาตั้งค่า VITE_GOOGLE_SHEET_URL ใน Vercel ให้ถูกต้อง และกด Deploy อีกครั้ง", "error");
-        } else if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
+        if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
            triggerToast(`โหลดข้อมูลไม่สำเร็จ: CORS หรือ URL ผิด (${msg})`, "error");
         } else {
            triggerToast(`โหลดข้อมูลไม่สำเร็จ: ${msg}`, "error");

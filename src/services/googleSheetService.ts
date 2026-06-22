@@ -4,7 +4,7 @@
  * Service to handle synchronization with Google Sheets via Google Apps Script
  */
 
-const SCRIPT_URL = import.meta.env.VITE_GOOGLE_SHEET_URL;
+const SCRIPT_URL = import.meta.env.VITE_GOOGLE_SHEET_URL || "https://script.google.com/macros/s/AKfycbyCb7Byo0Zn8-VtxQ-6xwy0K0UR42s_8U4zcUfR6ReFl1ILZ18Nt-dvJLk1dd6VtgEI/exec";
 
 export type SheetName = 'Orders' | 'Products' | 'Settings' | 'Admins' | 'Schools' | 'TrainingCenters';
 
@@ -14,7 +14,7 @@ export const googleSheetService = {
    */
   async syncRecord(sheet: SheetName, payload: any) {
     if (!SCRIPT_URL) {
-      console.warn('VITE_GOOGLE_SHEET_URL is not defined. Skipping sync.');
+      console.warn('VITE_GOOGLE_SHEET_URL is not defined. Skipping sync. Please redeploy if you just added it.');
       return;
     }
 
