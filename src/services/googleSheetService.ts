@@ -313,25 +313,6 @@ export const googleSheetService = {
     }
 
     try {
-      // Use the ultra-fast backend aggregator if local
-      try {
-        // Prevent concurrent identical fetch calls from sending multiple browser-level requests
-        // @ts-ignore
-        if (!window._bulkDataPromise || Date.now() - (window._bulkDataTime || 0) > 3000) {
-           // @ts-ignore
-           window._bulkDataTime = Date.now();
-           // @ts-ignore
-           window._bulkDataPromise = fetch('/api/admin/bulk-data').then(res => res.json());
-        }
-        // @ts-ignore
-        const bulkData = await window._bulkDataPromise;
-        if (bulkData && bulkData[sheet]) {
-           return bulkData[sheet];
-        }
-      } catch (e) {
-         console.warn("Fast bulk data fetch failed, falling back to direct AppScript fetch");
-      }
-
       const url = `${SCRIPT_URL}?action=read&sheet=${sheet}&_t=${Date.now()}`;
       const response = await fetch(url, { cache: 'no-store' });
       if (!response.ok) throw new Error('Network response was not ok');
