@@ -215,6 +215,7 @@ export default function Checkout({ cart, paymentSettingsProp, onClearCart }: Che
       let slipMimeType = '';
       if (slipFile) {
         slipMimeType = slipFile.type || 'image/jpeg';
+        let base64data = '';
         try {
           const options = {
             maxSizeMB: 0.2, // Max 200KB to fit easily in Firestore docs
@@ -223,13 +224,52 @@ export default function Checkout({ cart, paymentSettingsProp, onClearCart }: Che
             initialQuality: 0.7
           };
           const compressedFile = await imageCompression(slipFile, options);
-          const base64data = await imageCompression.getDataUrlFromFile(compressedFile);
-          slipUrl = base64data; // Store base64 directly
-          slipBase64 = base64data.split(',')[1] || '';
+          base64data = await imageCompression.getDataUrlFromFile(compressedFile);
         } catch (uploadError: any) {
-          console.error("Slip compression error:", uploadError);
-          throw new Error(`Cannot process image format: ${uploadError?.message || 'Unknown error'}. Please try another image.`); 
+          console.warn("Primary slip compression failed, trying fallback...", uploadError);
+          try {
+            base64data = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                  const canvas = document.createElement('canvas');
+                  let { width, height } = img;
+                  const maxDimension = 800;
+                  if (width > height && width > maxDimension) {
+                    height *= maxDimension / width;
+                    width = maxDimension;
+                  } else if (height > maxDimension) {
+                    width *= maxDimension / height;
+                    height = maxDimension;
+                  }
+                  canvas.width = width;
+                  canvas.height = height;
+                  const ctx = canvas.getContext('2d');
+                  if (ctx) {
+                    ctx.drawImage(img, 0, 0, width, height);
+                    resolve(canvas.toDataURL(slipFile.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.7));
+                  } else {
+                    reject(new Error('Canvas ctx null'));
+                  }
+                };
+                img.onerror = () => reject(new Error('Image load failed'));
+                if (typeof event.target?.result === 'string') {
+                  img.src = event.target.result;
+                } else {
+                  reject(new Error('Invalid reader result'));
+                }
+              };
+              reader.onerror = () => reject(new Error('File read failed'));
+              reader.readAsDataURL(slipFile);
+            });
+          } catch (fallbackError: any) {
+            console.error("Fallback compression error:", fallbackError);
+            throw new Error(`Cannot process image format: ${fallbackError?.message || uploadError?.message || 'Unknown error'}. Please try another image.`); 
+          }
         }
+        slipUrl = base64data; // Store base64 directly
+        slipBase64 = base64data.split(',')[1] || '';
       }
 
       const generatedOrderId = Math.random().toString(36).substring(2, 10).toUpperCase();

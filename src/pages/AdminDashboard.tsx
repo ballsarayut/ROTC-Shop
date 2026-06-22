@@ -309,12 +309,52 @@ export default function AdminDashboard() {
       const options = {
         maxSizeMB: 0.2, // Max 200KB limit
         maxWidthOrHeight: 800,
-        useWebWorker: false, // Compatibility with some browsers
+        useWebWorker: false, // false for compatibility
         initialQuality: 0.7
       };
       
-      const compressedFile = await imageCompression(file, options);
-      const base64data = await imageCompression.getDataUrlFromFile(compressedFile);
+      let base64data = '';
+      try {
+        const compressedFile = await imageCompression(file, options);
+        base64data = await imageCompression.getDataUrlFromFile(compressedFile);
+      } catch (err: any) {
+        console.warn("Primary compression failed, trying Canvas fallback...", err);
+        base64data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              let { width, height } = img;
+              const maxDimension = 800;
+              if (width > height && width > maxDimension) {
+                height *= maxDimension / width;
+                width = maxDimension;
+              } else if (height > maxDimension) {
+                width *= maxDimension / height;
+                height = maxDimension;
+              }
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                ctx.drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL(file.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.7));
+              } else {
+                reject(new Error('Canvas ctx null'));
+              }
+            };
+            img.onerror = () => reject(new Error('Image load failed'));
+            if (typeof event.target?.result === 'string') {
+              img.src = event.target.result;
+            } else {
+              reject(new Error('Invalid reader result'));
+            }
+          };
+          reader.onerror = () => reject(new Error('File read failed'));
+          reader.readAsDataURL(file);
+        });
+      }
 
       // Update in Firestore
       const orderRef = doc(db, 'orders', orderId);
