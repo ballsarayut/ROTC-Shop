@@ -210,12 +210,15 @@ export default function Checkout({ cart, paymentSettingsProp, onClearCart }: Che
     
     setLoading(true);
     try {
+      const generatedOrderId = Math.random().toString(36).substring(2, 10).toUpperCase();
+
       let slipUrl = '';
       let slipBase64 = '';
       let slipMimeType = '';
       if (slipFile) {
         slipMimeType = slipFile.type || 'image/jpeg';
         let base64data = '';
+        let finalFileToUpload: File | Blob = slipFile;
         try {
           const options = {
             maxSizeMB: 0.2, // Max 200KB to fit easily in Firestore docs
@@ -224,6 +227,7 @@ export default function Checkout({ cart, paymentSettingsProp, onClearCart }: Che
             initialQuality: 0.7
           };
           const compressedFile = await imageCompression(slipFile, options);
+          finalFileToUpload = compressedFile;
           base64data = await imageCompression.getDataUrlFromFile(compressedFile);
         } catch (uploadError: any) {
           console.warn("Primary slip compression failed, trying fallback...", uploadError);
@@ -248,7 +252,14 @@ export default function Checkout({ cart, paymentSettingsProp, onClearCart }: Che
                   const ctx = canvas.getContext('2d');
                   if (ctx) {
                     ctx.drawImage(img, 0, 0, width, height);
-                    resolve(canvas.toDataURL(slipFile.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.7));
+                    const dataUrl = canvas.toDataURL(slipFile.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.7);
+                    
+                    // Convert back to blob for upload
+                    canvas.toBlob((blob) => {
+                      if (blob) finalFileToUpload = blob;
+                    }, slipFile.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.7);
+
+                    resolve(dataUrl);
                   } else {
                     reject(new Error('Canvas ctx null'));
                   }
@@ -268,11 +279,26 @@ export default function Checkout({ cart, paymentSettingsProp, onClearCart }: Che
             throw new Error(`Cannot process image format: ${fallbackError?.message || uploadError?.message || 'Unknown error'}. Please try another image.`); 
           }
         }
-        slipUrl = base64data; // Store base64 directly
+        
         slipBase64 = base64data.split(',')[1] || '';
+        
+        // Upload to Google Drive using App Script instead of Firebase Storage
+        try {
+          const extension = slipMimeType === 'image/png' ? 'png' : 'jpg';
+          const filename = `slip_order_${generatedOrderId}.${extension}`;
+          const uploadedUrl = await googleSheetService.uploadFile(slipBase64, slipMimeType, filename);
+          if (uploadedUrl) {
+            slipUrl = uploadedUrl;
+          } else {
+             // Fallback to storing a small indicator, or store base64 if it's small enough?
+             // Since it fails, storing full base64 will crash sheets. We use UPLOAD_FAILED.
+             slipUrl = "UPLOAD_FAILED_" + generatedOrderId;
+          }
+        } catch (uploadLibError) {
+          console.error("Failed to upload via App Script:", uploadLibError);
+          slipUrl = "UPLOAD_FAILED_" + generatedOrderId;
+        }
       }
-
-      const generatedOrderId = Math.random().toString(36).substring(2, 10).toUpperCase();
 
       const orderData = {
         fullName: `${formData.firstName} ${formData.lastName}`.trim(),

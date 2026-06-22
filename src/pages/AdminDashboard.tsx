@@ -954,8 +954,12 @@ export default function AdminDashboard() {
         if (!isMounted) return;
         const msg = error instanceof Error ? error.message : String(error);
         console.error("Orders fetch error from Sheets:", msg);
-        if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
-           triggerToast(`โหลดข้อมูลไม่สำเร็จ: CORS หรือ URL ผิด (${msg})`, "error");
+        if (msg.includes("getValues on object Range")) {
+           triggerToast(`Google Sheets ล่ม: เพราะมีรูปภาพขนาดใหญ่ในตาราง`, "error");
+           alert("ข้อผิดพลาดจาก Google Sheets (getValues on object Range):\n\nสลิปรูปภาพแบบข้อความ (Base64) ในตารางทำให้ระบบ Sheets พัง\n\n*** ผมเขียน \"สคริปต์กู้ชีพ\" ไว้ให้แล้ว! ***\nไม่ต้องให้เด็กสั่งใหม่ สลิปไม่หาย ทำตามนี้:\n\n1. กลับไปที่ Google Apps Script\n2. ไปที่เมนู (Dropdown) ด้านบน (ที่ปกติเขียนว่า doGet หรือ doPost)\n3. เลื่อนหาฟังก์ชันชื่อ **migrateBase64ToDrive** แล้วเลือก\n4. กดปุ่ม 'Run' (เรียกใช้)\n5. รอให้สคริปต์ทำงานเสร็จ (มันจะกู้รูปจากข้อความยาวๆ เป็นลิงก์ Google Drive สั้นๆ)\n6. กลับมารีเฟรชหน้านี้ได้เลยครับ ทุกอย่างจะกลับมาปกติ!");
+        } else if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("CORS")) {
+           triggerToast(`ติดปัญหา CORS/ดึงข้อมูลล้มเหลว กรุณาเช็คตั้งค่า 3 อย่าง (คลิกเพื่อดู)`, "error");
+           alert("เกิดข้อผิดพลาดในการดึงข้อมูลจาก Google Sheets (CORS Error) มักเกิดจาก:\n\n1. คุณลืมตั้งค่า 'Who has access' (ผู้มีสิทธิ์เข้าถึง) ให้เป็น 'Anyone' (ทุกคน)\n2. ไม่มีชีตชื่อ (เช่น 'Orders', 'Products', 'Settings', 'Admins', 'Schools', 'TrainingCenters') กรุณาเปลี่ยนชื่อแท็บใน Google Sheets ให้ครบและถูกต้อง\n3. โค้ด Apps Script เกิด Error ภายใน (ให้ไปที่เมนู Executions/การดำเนินการ ใน Apps Script เพื่อดูว่าบรรทัดไหนพัง)");
         } else {
            triggerToast(`โหลดข้อมูลไม่สำเร็จ: ${msg}`, "error");
         }
@@ -5434,7 +5438,23 @@ export default function AdminDashboard() {
                   ระบบจัดเตรียมฐานข้อมูลสำรองและทำงานประสานข้อมูลร่วมกับ Google Sheets ครบถ้วนรวดเร็ว 100%
                 </p>
                 <div className="mt-2 text-xs text-emerald-600 bg-emerald-100/50 p-2 rounded break-all font-mono">
-                  URL: {getGoogleSheetUrl() || "Loading..."}
+                  URL ปัจจุบัน: {getGoogleSheetUrl() || "Loading..."}
+                </div>
+                {getGoogleSheetUrl() && (
+                  <div className="mt-2 text-xs text-red-600 bg-red-100 p-3 rounded border border-red-200">
+                    ⚠️ <b>ข้อมูลไม่ขึ้น (Error 404/CORS หรือ Error getValues):</b> ระบบเช็คพบปัญหาการดึงข้อมูล ให้แก้ไขตามนี้ทีละข้อ:<br/>
+                    1. <b>URL เก่าหรือพัง (สำคัญสุด):</b> ไปที่ Google Sheets -&gt; Extensions -&gt; Apps Script -&gt; กดปุ่ม <b>Deploy -&gt; New deployment</b> (ห้ามใช้ Manage Deployments เก่า)<br/>
+                    2. เลือกระดับสิทธิ์เป็น <b>Who has access: "Anyone" (ทุกคน)</b> เท่านั้น<br/>
+                    3. คัดลอก URL อันใหม่ล่าสุด ไปใส่ใน <b>VITE_GOOGLE_SHEET_URL</b> ในเว็บ Vercel แล้วกด Save และไปลบ Deploy อันเก่าใน Vercel ให้มันสร้างใหม่<br/>
+                    4. เช็คว่ามีแท็บใน Google Sheets ครบตามนี้: <b>Orders , Products , Settings , Admins , Schools , TrainingCenters</b> (ชื่อต้องเป๊ะทุกตัวอักษร)<br/>
+                    5. <b>เช็คว่าแท็บ Orders ว่างเปล่าหรือไม่:</b> ถ้าไม่มีหัวตารางเลย ให้พิมพ์ข้อความไว้ในแถวที่ 1 (เช่น id, date, ข้อมูลอื่นๆ) เพื่อไม่ให้ตารางพัง
+                  </div>
+                )}
+                
+                <div className="mt-4 flex gap-2">
+                  <a href="/AppsScript.txt" target="_blank" className="inline-flex py-1.5 px-3 bg-army-dark text-white text-xs font-bold rounded-lg hover:bg-army-dark/90 items-center justify-center">
+                    📋 กดดู / คัดลอกโค้ด Apps Script อันใหม่ได้ที่นี่ !
+                  </a>
                 </div>
               </div>
             </div>

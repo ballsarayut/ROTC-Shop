@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-const SCRIPT_URL = process.env.VITE_GOOGLE_SHEET_URL || "https://script.google.com/macros/s/AKfycbyCb7Byo0Zn8-VtxQ-6xwy0K0UR42s_8U4zcUfR6ReFl1ILZ18Nt-dvJLk1dd6VtgEI/exec";
+const SCRIPT_URL = process.env.VITE_GOOGLE_SHEET_URL || "https://script.google.com/macros/s/AKfycbzDK0eJbUGIr2VZJPk5lz0WOFl1RV2DvK7yVy6VVJw-V4bSrMtFPID99rW7IXHV5vI-/exec";
 
 async function syncRecord(sheet: string, payload: any) {
   const sanitizedPayload = { ...payload };

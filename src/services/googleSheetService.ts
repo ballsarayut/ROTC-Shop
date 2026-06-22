@@ -4,7 +4,7 @@
  * Service to handle synchronization with Google Sheets via Google Apps Script
  */
 
-const SCRIPT_URL = import.meta.env.VITE_GOOGLE_SHEET_URL || "https://script.google.com/macros/s/AKfycbyCb7Byo0Zn8-VtxQ-6xwy0K0UR42s_8U4zcUfR6ReFl1ILZ18Nt-dvJLk1dd6VtgEI/exec";
+const SCRIPT_URL = import.meta.env.VITE_GOOGLE_SHEET_URL || "https://script.google.com/macros/s/AKfycbzDK0eJbUGIr2VZJPk5lz0WOFl1RV2DvK7yVy6VVJw-V4bSrMtFPID99rW7IXHV5vI-/exec";
 
 export type SheetName = 'Orders' | 'Products' | 'Settings' | 'Admins' | 'Schools' | 'TrainingCenters';
 
@@ -307,6 +307,40 @@ export const googleSheetService = {
   },
 
   /**
+   * Upload a base64 slip file directly to Google Drive
+   */
+  async uploadFile(base64Data: string, mimeType: string, filename: string): Promise<string | null> {
+    if (!SCRIPT_URL) return null;
+
+    try {
+      const response = await fetch(SCRIPT_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+        body: JSON.stringify({
+          action: 'uploadFile',
+          payload: {
+            base64: base64Data,
+            mimeType,
+            filename
+          },
+        }),
+      });
+      const data = await response.json();
+      if (data && data.status === 'success') {
+        return data.url;
+      } else {
+        console.warn("Drive upload error:", data.message);
+        return null;
+      }
+    } catch (error) {
+      console.warn(`Error uploading file to Drive:`, error);
+      return null;
+    }
+  },
+
+  /**
    * Fetch all records from a sheet via high-speed server side caching daemon
    */
   async fetchRecords(sheet: SheetName) {
@@ -322,10 +356,16 @@ export const googleSheetService = {
       try {
         data = await response.json();
       } catch (err: any) {
+        if (response.status === 404) {
+          throw new Error('ระบบ Google บล็อกการเข้าถึง (404) - คุณยังไม่ได้ตั้งค่าสิทธิ์ให้เป็น "Anyone" (ทุกคน) ในตอนที่กด Deploy');
+        }
         throw new Error('URL ไม่ถูกต้อง หรือยังไม่ได้ตั้งค่าสิทธิ์ Apps Script เป็น "Anyone" (ทุกคน). กรุณาตรวจสอบการตั้งค่า Deploy ใน Apps Script.');
       }
       if (data && data.error) {
         throw new Error(data.error);
+      }
+      if (data && data.status === 'error' && data.message) {
+         throw new Error(data.message);
       }
       return data;
     } catch (error) {
