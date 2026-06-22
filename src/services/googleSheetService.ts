@@ -315,8 +315,13 @@ export const googleSheetService = {
     try {
       const url = `${SCRIPT_URL}?action=read&sheet=${sheet}&_t=${Date.now()}`;
       const response = await fetch(url, { cache: 'no-store' });
-      if (!response.ok) throw new Error('Network response was not ok');
-      const data = await response.json();
+      if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
+      let data;
+      try {
+        data = await response.json();
+      } catch (err: any) {
+        throw new Error('URL ไม่ถูกต้อง หรือยังไม่ได้ตั้งค่าสิทธิ์ Apps Script เป็น "Anyone" (ทุกคน). กรุณาตรวจสอบการตั้งค่า Deploy ใน Apps Script.');
+      }
       if (data && data.error) {
         throw new Error(data.error);
       }
