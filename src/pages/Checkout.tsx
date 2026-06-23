@@ -73,6 +73,7 @@ export default function Checkout({ cart, paymentSettingsProp, onClearCart }: Che
 
   useEffect(() => {
     const fetchData = async () => {
+      let fetchFailed = false;
       try {
         if (!paymentSettingsProp) {
           const sheetSettings = await googleSheetService.fetchRecords('Settings');
@@ -85,51 +86,43 @@ export default function Checkout({ cart, paymentSettingsProp, onClearCart }: Che
               shippingFee: Number(paymentSet.shippingFee) || 0,
               qrCodeUrl: paymentSet.qrCodeUrl || '',
             });
-          } else if (!paymentSettings) {
-            setPaymentSettings({ bankName: 'ธนาคารกรุงเทพ', accountNumber: '123-4-56789-0', accountName: 'นาย ทหาร ทดสอบ (ใช้บัญชีสำรองชั่วคราว)', shippingFee: 0, qrCodeUrl: '' });
           }
         }
         
         const sheetCenters = await googleSheetService.fetchRecords('TrainingCenters');
         if (sheetCenters && sheetCenters.length > 0) {
           const parsedCenters = sheetCenters.map((c: any) => ({
-            id: c.id,
-            name: c.name,
+            id: c.id || '',
+            name: c.name || '',
             location: c.location || '',
           }));
-          parsedCenters.sort((a, b) => a.name.localeCompare(b.name, 'th'));
+          parsedCenters.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'th'));
           setTrainingCenters(parsedCenters);
-        } else if (trainingCenters.length === 0) {
-          setTrainingCenters([{ id: 'c1', name: 'ศูนย์ฝึก ศูนย์ฝึกนักศึกษาวิชาทหาร มทบ.45', location: 'มทบ.45' }]);
         }
 
         const sheetSchools = await googleSheetService.fetchRecords('Schools');
         if (sheetSchools && sheetSchools.length > 0) {
           const parsedSchools = sheetSchools.map((s: any) => ({
-            id: s.id,
-            name: s.name,
+            id: s.id || '',
+            name: s.name || '',
             trainingCenterId: s.trainingCenterId || s.centerId || '',
             trainingCenterName: s.trainingCenterName || s.centerName || '',
             shippingAddress: s.shippingAddress || s.address || '',
             contactPerson: s.contactPerson || s.contact || '',
             contactPhone: s.contactPhone || s.phone || '',
           }));
-          parsedSchools.sort((a, b) => a.name.localeCompare(b.name, 'th'));
+          parsedSchools.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'th'));
           setSchools(parsedSchools);
-        } else if (schools.length === 0) {
-          setSchools([{ id: 's1', name: 'โรงเรียนสุราษฎร์ธานี', trainingCenterId: 'c1', trainingCenterName: 'ศูนย์ฝึกนักศึกษาวิชาทหาร มทบ.45' }]);
         }
       } catch (error) {
         console.error('Error fetching data from Google Sheets:', error);
+        fetchFailed = true;
+      } finally {
         if (!paymentSettingsProp && !paymentSettings) {
-           setPaymentSettings({ bankName: 'ธนาคารกรุงเทพ', accountNumber: '123-4-56789-0', accountName: 'นาย ทหาร ทดสอบ (ใช้บัญชีสำรองชั่วคราว)', shippingFee: 0, qrCodeUrl: '' });
+           setPaymentSettings(prev => prev || { bankName: 'ธนาคารกรุงเทพ', accountNumber: '123-4-56789-0', accountName: 'ระบบติดขัด (อัพโหลดไม่ได้)', shippingFee: 0, qrCodeUrl: '' });
         }
-        if (trainingCenters.length === 0) {
-           setTrainingCenters([{ id: 'c1', name: 'ศูนย์ฝึก ศูนย์ฝึกนักศึกษาวิชาทหาร มทบ.45', location: 'มทบ.45' }]);
-        }
-        if (schools.length === 0) {
-           setSchools([{ id: 's1', name: 'โรงเรียนสุราษฎร์ธานี', trainingCenterId: 'c1', trainingCenterName: 'ศูนย์ฝึกนักศึกษาวิชาทหาร มทบ.45' }]);
-        }
+        setTrainingCenters(prev => prev.length === 0 ? [{ id: 'c1', name: 'ศูนย์ฝึก ศูนย์ฝึกนักศึกษาวิชาทหาร มทบ.45', location: 'มทบ.45' }] : prev);
+        setSchools(prev => prev.length === 0 ? [{ id: 's1', name: 'โรงเรียนสุราษฎร์ธานี', trainingCenterId: 'c1', trainingCenterName: 'ศูนย์ฝึกนักศึกษาวิชาทหาร มทบ.45' }] : prev);
       }
     };
 
