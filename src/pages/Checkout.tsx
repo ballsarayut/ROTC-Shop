@@ -8,6 +8,7 @@ import { verifySlipImage } from '../services/geminiService';
 import { formatPrice, cn, formatItemSize } from '../lib/utils';
 import { ShoppingCart, User, MapPin, CreditCard, Upload, CheckCircle2, Loader2, QrCode, Banknote, Truck, School, Building2, Info, ArrowLeft, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import fallbackData from '../data/fallbackData.json';
 
 interface CheckoutProps {
   cart: OrderItem[];
@@ -119,10 +120,24 @@ export default function Checkout({ cart, paymentSettingsProp, onClearCart }: Che
         fetchFailed = true;
       } finally {
         if (!paymentSettingsProp && !paymentSettings) {
-           setPaymentSettings(prev => prev || { bankName: 'ธนาคารกรุงเทพ', accountNumber: '123-4-56789-0', accountName: 'ระบบติดขัด (อัพโหลดไม่ได้)', shippingFee: 0, qrCodeUrl: '' });
+           setPaymentSettings(prev => prev || { bankName: 'ธนาคารกรุงเทพ', accountNumber: '123-4-56789-0', accountName: 'ระบบขัดข้อง (กรุณาแจ้งแอดมิน)', shippingFee: 0, qrCodeUrl: '' });
         }
-        setTrainingCenters(prev => prev.length === 0 ? [{ id: 'c1', name: 'ศูนย์ฝึก ศูนย์ฝึกนักศึกษาวิชาทหาร มทบ.45', location: 'มทบ.45' }] : prev);
-        setSchools(prev => prev.length === 0 ? [{ id: 's1', name: 'โรงเรียนสุราษฎร์ธานี', trainingCenterId: 'c1', trainingCenterName: 'ศูนย์ฝึกนักศึกษาวิชาทหาร มทบ.45' }] : prev);
+        setTrainingCenters(prev => {
+          if (prev.length > 0) return prev;
+          try {
+            return fallbackData.centers || [];
+          } catch(e) {
+            return [];
+          }
+        });
+        setSchools(prev => {
+          if (prev.length > 0) return prev;
+          try {
+             return fallbackData.schools || [];
+          } catch(e) {
+            return [];
+          }
+        });
       }
     };
 
