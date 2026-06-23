@@ -289,13 +289,24 @@ function migrateBase64ToDrive() {
   }
 
   var processedCount = 0;
-  Logger.log('กำลังตรวจสอบข้อมูล ' + (lastRow - 1) + ' แถว...');
+  var errorCount = 0;
+  var startTime = new Date().getTime();
+  Logger.log('กำลังตรวจสอบข้อมูลทั้งหมด ' + (lastRow - 1) + ' แถว...');
 
-  // Process row by row safely
-  for (var i = 2; i <= lastRow; i++) {
-    for (var j = 1; j <= lastCol; j++) {
-      var range = sheet.getRange(i, j);
-      var val = range.getValue();
+  // ใช้ getValues เพื่อดึงข้อมูลทั้งหมดมาประมวลผลพร้อมกัน (เร็วกว่า getRange ทีละช่องเป็นร้อยเท่า)
+  var range = sheet.getRange(2, 1, lastRow - 1, lastCol);
+  var values = range.getValues();
+  var isUpdated = false;
+
+  for (var r = 0; r < values.length; r++) {
+    // Check timeout (Apps Script limits to 6 mins, we stop at 5 mins to be safe)
+    if (new Date().getTime() - startTime > 5 * 60 * 1000) {
+       Logger.log('ใกล้หมดเวลา 5 นาทีของระบบแล้ว หยุดชั่วคราว... (กำลังบันทึกข้อมูลที่ทำเสร็จ...)');
+       break;
+    }
+
+    for (var c = 0; c < values[r].length; c++) {
+      var val = values[r][c];
       
       if (typeof val === 'string' && val.indexOf('data:image/') === 0 && val.length > 500) {
         try {
@@ -303,25 +314,51 @@ function migrateBase64ToDrive() {
           var base64Data = val.split(',')[1];
           
           if (!base64Data) continue;
+          
+          // Clean base64 string
+          base64Data = base64Data.replace(/[^A-Za-z0-9+/=]/g, '');
+          
+          // Padding base64
+          while (base64Data.length % 4 !== 0) {
+            base64Data += '=';
+          }
 
-          var filename = 'slip_recovered_row_' + i + '.jpg';
+          var filename = 'slip_recovered_row_' + (r + 2) + '.jpg';
           if (mimeType.indexOf('png') !== -1) {
-            filename = 'slip_recovered_row_' + i + '.png';
+            filename = 'slip_recovered_row_' + (r + 2) + '.png';
           }
           
-          var blob = Utilities.newBlob(Utilities.base64Decode(base64Data), mimeType, filename);
-          var file = DriveApp.createFile(blob);
-          file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-          
-          var directUrl = "https://drive.google.com/uc?export=view&id=" + file.getId();
-          range.setValue(directUrl);
-          processedCount++;
-          Logger.log('แถวที่ ' + i + ' คอลัมน์ที่ ' + j + ': กู้คืนสำเร็จ -> ' + directUrl);
+          try {
+            var blob = Utilities.newBlob(Utilities.base64Decode(base64Data), mimeType, filename);
+            var file = DriveApp.createFile(blob);
+            file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+            
+            var directUrl = "https://drive.google.com/uc?export=view&id=" + file.getId();
+            values[r][c] = directUrl; // เปลี่ยนข้อมูลใน Array
+            processedCount++;
+            isUpdated = true;
+            Logger.log('แถวที่ ' + (r + 2) + ': กู้คืนสำเร็จ -> ' + directUrl);
+          } catch (decodeError) {
+            // ถ้า Code มาตรงนี้แปลว่า Base64 ถูก Google Sheets ตัดทอนจนพัง (เกินลิมิต 50,000 ตัวอักษร)
+            Logger.log('แถวที่ ' + (r + 2) + ' กู้ไม่ได้ (รูปขาดหาย): ' + decodeError.toString());
+            values[r][c] = "UPLOAD_FAILED_ROW_" + (r + 2) + "_CORRUPTED";
+            errorCount++;
+            isUpdated = true;
+          }
         } catch (e) {
-          Logger.log('แถวที่ ' + i + ' คอลัมน์ที่ ' + j + ' แปลงล้มเหลว: ' + e.toString());
+          Logger.log('แถวที่ ' + (r + 2) + ' แปลงล้มเหลว: ' + e.toString());
+          values[r][c] = "UPLOAD_FAILED_ROW_" + (r + 2) + "_ERROR";
+          errorCount++;
+          isUpdated = true;
         }
       }
     }
   }
-  Logger.log('เสร็จสิ้น! กู้คืนและแปลงรูปลง Google Drive ทั้งหมด ' + processedCount + ' รูป');
+
+  // เซฟข้อมูลทั้งหมดรวดเดียว
+  if (isUpdated) {
+    range.setValues(values);
+  }
+
+  Logger.log('เสร็จสิ้น! แปลงเป็นรูปลงไดรฟ์สำเร็จ ' + processedCount + ' รูป | รูปที่เสีย/กู้ไม่ได้ (ต้องให้เด็กส่งใหม่) ' + errorCount + ' รูป');
 }

@@ -219,65 +219,60 @@ export default function Checkout({ cart, paymentSettingsProp, onClearCart }: Che
         slipMimeType = slipFile.type || 'image/jpeg';
         let base64data = '';
         let finalFileToUpload: File | Blob = slipFile;
-        try {
-          const options = {
-            maxSizeMB: 0.2, // Max 200KB to fit easily in Firestore docs
-            maxWidthOrHeight: 800,
-            useWebWorker: false, // false for compatibility with LINE in-app browser
-            initialQuality: 0.7
-          };
-          const compressedFile = await imageCompression(slipFile, options);
-          finalFileToUpload = compressedFile;
-          base64data = await imageCompression.getDataUrlFromFile(compressedFile);
-        } catch (uploadError: any) {
-          console.warn("Primary slip compression failed, trying fallback...", uploadError);
-          try {
-            base64data = await new Promise<string>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = (event) => {
-                const img = new Image();
-                img.onload = () => {
-                  const canvas = document.createElement('canvas');
-                  let { width, height } = img;
-                  const maxDimension = 800;
-                  if (width > height && width > maxDimension) {
-                    height *= maxDimension / width;
-                    width = maxDimension;
-                  } else if (height > maxDimension) {
-                    width *= maxDimension / height;
-                    height = maxDimension;
-                  }
-                  canvas.width = width;
-                  canvas.height = height;
-                  const ctx = canvas.getContext('2d');
-                  if (ctx) {
-                    ctx.drawImage(img, 0, 0, width, height);
-                    const dataUrl = canvas.toDataURL(slipFile.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.7);
-                    
-                    // Convert back to blob for upload
-                    canvas.toBlob((blob) => {
-                      if (blob) finalFileToUpload = blob;
-                    }, slipFile.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.7);
 
-                    resolve(dataUrl);
+        try {
+          let processingFile: File | Blob = slipFile;
+          
+          // Detect HEIC/HEIF and convert to JPEG
+          if (slipFile.type === 'image/heic' || slipFile.type === 'image/heif' || slipFile.name.toLowerCase().endsWith('.heic')) {
+             try {
+                 const heic2any = (await import('heic2any')).default;
+                 const conversionResult = await heic2any({
+                     blob: slipFile,
+                     toType: 'image/jpeg',
+                     quality: 0.8
+                 });
+                 processingFile = Array.isArray(conversionResult) ? conversionResult[0] : (conversionResult as Blob);
+                 slipMimeType = 'image/jpeg';
+             } catch (heicError) {
+                 console.warn("HEIC conversion failed:", heicError);
+             }
+          }
+
+          try {
+            const options = {
+              maxSizeMB: 0.2, // Max 200KB
+              maxWidthOrHeight: 800,
+              useWebWorker: false, // false for compatibility with LINE in-app browser
+              initialQuality: 0.7
+            };
+            const fileForCompression = processingFile instanceof File 
+              ? processingFile 
+              : new File([processingFile], "slip.jpg", { type: processingFile.type });
+              
+            const compressedFile = await imageCompression(fileForCompression, options);
+            finalFileToUpload = compressedFile;
+            base64data = await imageCompression.getDataUrlFromFile(compressedFile);
+          } catch (compressError) {
+             console.warn("Primary compression failed, using direct FileReader fallback", compressError);
+             // Directly read as base64 without canvas
+             base64data = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                  if (typeof e.target?.result === 'string') {
+                    resolve(e.target.result);
                   } else {
-                    reject(new Error('Canvas ctx null'));
+                    reject(new Error("Cannot read file"));
                   }
                 };
-                img.onerror = () => reject(new Error('Image load failed'));
-                if (typeof event.target?.result === 'string') {
-                  img.src = event.target.result;
-                } else {
-                  reject(new Error('Invalid reader result'));
-                }
-              };
-              reader.onerror = () => reject(new Error('File read failed'));
-              reader.readAsDataURL(slipFile);
-            });
-          } catch (fallbackError: any) {
-            console.error("Fallback compression error:", fallbackError);
-            throw new Error(`Cannot process image format: ${fallbackError?.message || uploadError?.message || 'Unknown error'}. Please try another image.`); 
+                reader.onerror = () => reject(new Error("File read failed"));
+                reader.readAsDataURL(processingFile);
+             });
+             finalFileToUpload = processingFile;
           }
+        } catch (uploadError: any) {
+           console.error("General upload parsing error", uploadError);
+           throw new Error(`อัพโหลดรูปไม่สำเร็จ: กรุณาลองใช้รูปอื่น หรือแคปหน้าจอสลิปแล้วอัพโหลดรูปที่แคปแทนครับ`); 
         }
         
         slipBase64 = base64data.split(',')[1] || '';
@@ -290,13 +285,15 @@ export default function Checkout({ cart, paymentSettingsProp, onClearCart }: Che
           if (uploadedUrl) {
             slipUrl = uploadedUrl;
           } else {
-             // Fallback to storing a small indicator, or store base64 if it's small enough?
-             // Since it fails, storing full base64 will crash sheets. We use UPLOAD_FAILED.
-             slipUrl = "UPLOAD_FAILED_" + generatedOrderId;
+             throw new Error("อัพโหลดสลิปล้มเหลว: แอดมินยังไม่ได้ตั้งค่า Google Drive (หรือ Deploy ไม่สมบูรณ์) โปรดแจ้งแอดมินแก้ไขด่วน!");
           }
         } catch (uploadLibError) {
           console.error("Failed to upload via App Script:", uploadLibError);
-          slipUrl = "UPLOAD_FAILED_" + generatedOrderId;
+          const msg = uploadLibError instanceof Error ? uploadLibError.message : String(uploadLibError);
+          if (msg.includes("แอดมินยังไม่ได้ตั้งค่า")) {
+             throw uploadLibError;
+          }
+          throw new Error("อัพโหลดสลิปขัดข้อง: ไม่สามารถส่งรูปไปยังเซิร์ฟเวอร์ โปรดลองใหม่อีกครั้ง");
         }
       }
 
