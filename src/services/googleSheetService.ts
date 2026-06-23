@@ -310,7 +310,7 @@ export const googleSheetService = {
    * Upload a base64 slip file directly to Google Drive
    */
   async uploadFile(base64Data: string, mimeType: string, filename: string): Promise<string | null> {
-    if (!SCRIPT_URL) return null;
+    if (!SCRIPT_URL) throw new Error('VITE_GOOGLE_SHEET_URL is not configured');
 
     try {
       const response = await fetch(SCRIPT_URL, {
@@ -332,11 +332,11 @@ export const googleSheetService = {
         return data.url;
       } else {
         console.warn("Drive upload error:", data.message);
-        return null;
+        throw new Error("Apps Script (Drive): " + data.message);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.warn(`Error uploading file to Drive:`, error);
-      return null;
+      throw new Error(`Upload to Drive failed: ${error.message}`);
     }
   },
 

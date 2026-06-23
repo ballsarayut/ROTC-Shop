@@ -290,10 +290,7 @@ export default function Checkout({ cart, paymentSettingsProp, onClearCart }: Che
         } catch (uploadLibError) {
           console.error("Failed to upload via App Script:", uploadLibError);
           const msg = uploadLibError instanceof Error ? uploadLibError.message : String(uploadLibError);
-          if (msg.includes("แอดมินยังไม่ได้ตั้งค่า")) {
-             throw uploadLibError;
-          }
-          throw new Error("อัพโหลดสลิปขัดข้อง: ไม่สามารถส่งรูปไปยังเซิร์ฟเวอร์ โปรดลองใหม่อีกครั้ง");
+          throw new Error("อัพโหลดสลิปล้มเหลว: " + msg);
         }
       }
 

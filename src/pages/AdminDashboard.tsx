@@ -5444,8 +5444,9 @@ export default function AdminDashboard() {
                   <div className="mt-2 text-xs text-red-600 bg-red-100 p-3 rounded border border-red-200">
                     ⚠️ <b>ข้อมูลไม่ขึ้น (Error 404/CORS หรือ Error getValues):</b> ระบบเช็คพบปัญหาการดึงข้อมูล ให้แก้ไขตามนี้ทีละข้อ:<br/>
                     1. <b>URL เก่าหรือพัง (สำคัญสุด):</b> ไปที่ Google Sheets -&gt; Extensions -&gt; Apps Script -&gt; กดปุ่ม <b>Deploy -&gt; New deployment</b> (ห้ามใช้ Manage Deployments เก่า)<br/>
-                    2. เลือกระดับสิทธิ์เป็น <b>Who has access: "Anyone" (ทุกคน)</b> เท่านั้น<br/>
-                    3. คัดลอก URL อันใหม่ล่าสุด ไปใส่ใน <b>VITE_GOOGLE_SHEET_URL</b> ในเว็บ Vercel แล้วกด Save และไปลบ Deploy อันเก่าใน Vercel ให้มันสร้างใหม่<br/>
+                    2. ก่อน Deploy <b>สำคัญมาก:</b> ให้เลือกฟังก์ชัน <b>authorizeDrive</b> ด้านบนแล้วกด <b>เรียกใช้งาน (Run)</b> เพื่ออนุญาตสิทธิ์ Google Drive ให้เรียบร้อย<br/>
+                    3. กด Deploy -&gt; New deployment และต้องเลือกระดับสิทธิ์เป็น <b>Who has access: "Anyone" (ทุกคน)</b> เท่านั้น<br/>
+                    4. คัดลอก URL อันใหม่ล่าสุด ไปใส่ใน <b>VITE_GOOGLE_SHEET_URL</b> ในเว็บ Vercel แล้วกด Save และไปลบ Deploy อันเก่าใน Vercel ให้มันสร้างใหม่<br/>
                     4. เช็คว่ามีแท็บใน Google Sheets ครบตามนี้: <b>Orders , Products , Settings , Admins , Schools , TrainingCenters</b> (ชื่อต้องเป๊ะทุกตัวอักษร)<br/>
                     5. <b>เช็คว่าแท็บ Orders ว่างเปล่าหรือไม่:</b> ถ้าไม่มีหัวตารางเลย ให้พิมพ์ข้อความไว้ในแถวที่ 1 (เช่น id, date, ข้อมูลอื่นๆ) เพื่อไม่ให้ตารางพัง
                   </div>

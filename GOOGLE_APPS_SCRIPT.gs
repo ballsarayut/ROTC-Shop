@@ -271,6 +271,20 @@ function uploadFileToDrive(payload) {
 }
 
 // ==========================================
+// ฟังก์ชันสำหรับขออนุญาตเข้าถึง Google Drive
+// ให้กด Run ฟังก์ชันนี้ 1 ครั้ง เพื่อให้ Google ขอสิทธิ์เข้าถึง Drive
+// ==========================================
+function authorizeDrive() {
+  try {
+    var file = DriveApp.createFile("test.txt", "test file", "text/plain");
+    file.setTrashed(true);
+    Logger.log("ได้รับสิทธิ์เข้าถึง Google Drive แล้ว! คุณสามารถใช้งานอัพโหลดสลิปได้ทันที");
+  } catch (e) {
+    Logger.log("เกิดข้อผิดพลาด: " + e.toString());
+  }
+}
+
+// ==========================================
 // ฟังก์ชันกู้ชีพ: แก้ปัญหา Base64 ยาวเกินไปจน Google Sheets ล่ม
 // ให้ผู้ใช้กดยืนยันให้ทำงานจากหน้า Apps Script ได้เลย
 // ==========================================
