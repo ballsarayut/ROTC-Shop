@@ -370,6 +370,25 @@ export const googleSheetService = {
       return data;
     } catch (error) {
       console.warn(`Error fetching ${sheet} from Google Sheets: Is VITE_GOOGLE_SHEET_URL configured correctly?`);
+      
+      try {
+        const fallbackData = await import('../data/fallbackData.json').then(m => m.default || m);
+        let key = sheet;
+        if (sheet === 'TrainingCenters') key = 'centers';
+        else if (sheet === 'Schools') key = 'schools';
+        else if (sheet === 'Orders') key = 'orders';
+        else if (sheet === 'Products') key = 'products';
+        else if (sheet === 'Admins') key = 'admins';
+        else if (sheet === 'Settings') key = 'settings';
+        
+        if (fallbackData && fallbackData[key]) {
+           console.warn(`[Fallback Mode] Using local fallback data for sheet: ${sheet}`);
+           return fallbackData[key];
+        }
+      } catch (fallbackError) {
+         console.warn("Could not load fallback data:", fallbackError);
+      }
+      
       throw error;
     }
   }

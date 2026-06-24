@@ -79,7 +79,11 @@ export default function Home({ onAddToCart }: HomeProps) {
 
   useEffect(() => {
     let isMounted = true;
-    localStorage.removeItem("admin_products_cache");
+    try {
+      localStorage.removeItem("admin_products_cache");
+    } catch (e) {
+      console.warn("Could not access localStorage", e);
+    }
     const fetchProducts = async (showLoading = true) => {
       try {
         if (isMounted && showLoading) {
@@ -87,9 +91,19 @@ export default function Home({ onAddToCart }: HomeProps) {
         }
 
         const { googleSheetService } = await import("../services/googleSheetService");
-        const sheetProducts = await googleSheetService.fetchRecords("Products");
         
-        if (!Array.isArray(sheetProducts)) return;
+        // Add a 10 second timeout for fetching products
+        const sheetProducts = await Promise.race([
+          googleSheetService.fetchRecords("Products"),
+          new Promise<any>((_, reject) => 
+            setTimeout(() => reject(new Error("Timeout fetching from Google Sheets")), 10000)
+          )
+        ]);
+        
+        if (!Array.isArray(sheetProducts)) {
+          if (showLoading) setLoading(false);
+          return;
+        }
 
         const prods = sheetProducts.map((p: any) => ({
           ...p,
@@ -133,7 +147,7 @@ export default function Home({ onAddToCart }: HomeProps) {
           } catch (e) {
             console.warn("Could not save to localStorage: Quota exceeded", e);
           }
-          if (showLoading) setLoading(false);
+          setLoading(false);
         }
       } catch (error) {
         if (!isMounted) return;
@@ -151,7 +165,7 @@ export default function Home({ onAddToCart }: HomeProps) {
         const fixPrices = (list: any[]) =>
           list.map((p) => ({ ...p, price: fixProductPrice(p.name, p.price) }));
         setProducts(fixPrices(INITIAL_PRODUCTS) as Product[]);
-        if (showLoading) setLoading(false);
+        setLoading(false);
       }
     };
 
