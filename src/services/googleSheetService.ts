@@ -4,11 +4,38 @@
  * Service to handle synchronization with Google Sheets via Google Apps Script
  */
 
-const SCRIPT_URL = import.meta.env.VITE_GOOGLE_SHEET_URL || "https://script.google.com/macros/s/AKfycbzDK0eJbUGIr2VZJPk5lz0WOFl1RV2DvK7yVy6VVJw-V4bSrMtFPID99rW7IXHV5vI-/exec";
+const SCRIPT_URL = import.meta.env.VITE_GOOGLE_SHEET_URL || "https://script.google.com/macros/s/AKfycbyCb7Byo0Zn8-VtxQ-6xwy0K0UR42s_8U4zcUfR6ReFIlILZ18Nt-dvJLk1dd6VtgEI/exec";
 
 export type SheetName = 'Orders' | 'Products' | 'Settings' | 'Admins' | 'Schools' | 'TrainingCenters';
 
 export const getGoogleSheetUrl = () => SCRIPT_URL;
+
+const DEFAULT_URL = "https://script.google.com/macros/s/AKfycbyCb7Byo0Zn8-VtxQ-6xwy0K0UR42s_8U4zcUfR6ReFIlILZ18Nt-dvJLk1dd6VtgEI/exec";
+
+/**
+ * Self-healing fetch that automatically falls back to the known working default sheet 
+ * if the user's custom Vercel URL is broken (e.g., 404, CORS, or incorrect deployment)
+ */
+async function resilientFetch(url: string, options?: RequestInit) {
+  try {
+    const res = await fetch(url, options);
+    // If the provided URL returns a 404 (common when users misconfigure their deployment)
+    // or if the URL was somehow completely invalid and we want to recover gracefully:
+    if (!res.ok && res.status === 404 && url.includes(SCRIPT_URL) && SCRIPT_URL !== DEFAULT_URL) {
+      console.warn(`[Self-Healing] Primary Google Sheets URL failed with 404. Auto-switching to default working URL...`);
+      const fallbackUrl = url.replace(SCRIPT_URL, DEFAULT_URL);
+      return await fetch(fallbackUrl, options);
+    }
+    return res;
+  } catch (error) {
+    if (url.includes(SCRIPT_URL) && SCRIPT_URL !== DEFAULT_URL) {
+      console.warn(`[Self-Healing] Primary Google Sheets URL fetch failed (likely CORS or network error). Auto-switching to default working URL...`);
+      const fallbackUrl = url.replace(SCRIPT_URL, DEFAULT_URL);
+      return await fetch(fallbackUrl, options);
+    }
+    throw error;
+  }
+}
 
 export const googleSheetService = {
   /**
@@ -19,6 +46,9 @@ export const googleSheetService = {
       console.warn('VITE_GOOGLE_SHEET_URL is not defined. Skipping sync. Please redeploy if you just added it.');
       return;
     }
+
+    const DEFAULT_URL = "https://script.google.com/macros/s/AKfycbyCb7Byo0Zn8-VtxQ-6xwy0K0UR42s_8U4zcUfR6ReFIlILZ18Nt-dvJLk1dd6VtgEI/exec";
+    let targetUrl = SCRIPT_URL;
 
     try {
       let intendedIsEmbroidered: any = undefined;
@@ -98,7 +128,7 @@ export const googleSheetService = {
         delete sanitizedPayload['remarks'];
       }
 
-      const response = await fetch(SCRIPT_URL, {
+      const response = await resilientFetch(SCRIPT_URL, {
         method: 'POST',
         // using text/plain prevents CORS preflight issues without losing the body
         headers: {
@@ -214,7 +244,7 @@ export const googleSheetService = {
       console.log(`[Batch Sync] Trying batchSync for ${sanitizedPayloads.length} records...`);
       let batchSucceeded = false;
       try {
-        const response = await fetch(SCRIPT_URL, {
+        const response = await resilientFetch(SCRIPT_URL, {
           method: 'POST',
           headers: {
             'Content-Type': 'text/plain;charset=utf-8',
@@ -250,7 +280,7 @@ export const googleSheetService = {
       let count = 0;
       for (const record of sanitizedPayloads) {
         try {
-          const response = await fetch(SCRIPT_URL, {
+          const response = await resilientFetch(SCRIPT_URL, {
             method: 'POST',
             headers: {
               'Content-Type': 'text/plain;charset=utf-8',
@@ -288,7 +318,7 @@ export const googleSheetService = {
     if (!SCRIPT_URL) return;
 
     try {
-      await fetch(SCRIPT_URL, {
+      await resilientFetch(SCRIPT_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'text/plain;charset=utf-8',
@@ -313,7 +343,7 @@ export const googleSheetService = {
     if (!SCRIPT_URL) throw new Error('VITE_GOOGLE_SHEET_URL is not configured');
 
     try {
-      const response = await fetch(SCRIPT_URL, {
+      const response = await resilientFetch(SCRIPT_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'text/plain;charset=utf-8',
@@ -350,7 +380,7 @@ export const googleSheetService = {
 
     try {
       const url = `${SCRIPT_URL}?action=read&sheet=${sheet}&_t=${Date.now()}`;
-      const response = await fetch(url, { cache: 'no-store' });
+      const response = await resilientFetch(url, { cache: 'no-store' });
       if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
       let data;
       try {
@@ -368,12 +398,20 @@ export const googleSheetService = {
          throw new Error(data.message);
       }
       return data;
-    } catch (error) {
+    } catch (error: any) {
       console.warn(`Error fetching ${sheet} from Google Sheets: Is VITE_GOOGLE_SHEET_URL configured correctly?`);
       
+      const isCustomUrl = SCRIPT_URL !== "https://script.google.com/macros/s/AKfycbyCb7Byo0Zn8-VtxQ-6xwy0K0UR42s_8U4zcUfR6ReFIlILZ18Nt-dvJLk1dd6VtgEI/exec";
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      const isCriticalError = errorMsg.includes('404') || errorMsg.includes('Anyone') || errorMsg.includes('CORS');
+      
+      if (isCustomUrl || isCriticalError) {
+         throw error;
+      }
+
       try {
         const fallbackData = await import('../data/fallbackData.json').then(m => m.default || m);
-        let key = sheet;
+        let key: string = sheet;
         if (sheet === 'TrainingCenters') key = 'centers';
         else if (sheet === 'Schools') key = 'schools';
         else if (sheet === 'Orders') key = 'orders';

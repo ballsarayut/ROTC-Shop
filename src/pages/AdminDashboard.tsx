@@ -222,6 +222,7 @@ export default function AdminDashboard() {
     } catch (e) {}
     return [];
   });
+  const [sheetError, setSheetError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [quotaExceeded, setQuotaExceeded] = useState(false);
 
@@ -947,6 +948,7 @@ export default function AdminDashboard() {
             }
             return prevOrders;
           });
+          setSheetError(null);
         }
 
         if (showLoading) setLoading(false);
@@ -954,6 +956,7 @@ export default function AdminDashboard() {
         if (!isMounted) return;
         const msg = error instanceof Error ? error.message : String(error);
         console.error("Orders fetch error from Sheets:", msg);
+        setSheetError(msg);
         if (msg.includes("getValues on object Range")) {
            triggerToast(`Google Sheets ล่ม: เพราะมีรูปภาพขนาดใหญ่ในตาราง`, "error");
            alert("ข้อผิดพลาดจาก Google Sheets (getValues on object Range):\n\nสลิปรูปภาพแบบข้อความ (Base64) ในตารางทำให้ระบบ Sheets พัง\n\n*** ผมเขียน \"สคริปต์กู้ชีพ\" ไว้ให้แล้ว! ***\nไม่ต้องให้เด็กสั่งใหม่ สลิปไม่หาย ทำตามนี้:\n\n1. กลับไปที่ Google Apps Script\n2. ไปที่เมนู (Dropdown) ด้านบน (ที่ปกติเขียนว่า doGet หรือ doPost)\n3. เลื่อนหาฟังก์ชันชื่อ **migrateBase64ToDrive** แล้วเลือก\n4. กดปุ่ม 'Run' (เรียกใช้)\n5. รอให้สคริปต์ทำงานเสร็จ (มันจะกู้รูปจากข้อความยาวๆ เป็นลิงก์ Google Drive สั้นๆ)\n6. กลับมารีเฟรชหน้านี้ได้เลยครับ ทุกอย่างจะกลับมาปกติ!");
@@ -5440,15 +5443,17 @@ export default function AdminDashboard() {
                 <div className="mt-2 text-xs text-emerald-600 bg-emerald-100/50 p-2 rounded break-all font-mono">
                   URL ปัจจุบัน: {getGoogleSheetUrl() || "Loading..."}
                 </div>
-                {getGoogleSheetUrl() && (
+                {sheetError && (
                   <div className="mt-2 text-xs text-red-600 bg-red-100 p-3 rounded border border-red-200">
                     ⚠️ <b>ข้อมูลไม่ขึ้น (Error 404/CORS หรือ Error getValues):</b> ระบบเช็คพบปัญหาการดึงข้อมูล ให้แก้ไขตามนี้ทีละข้อ:<br/>
                     1. <b>URL เก่าหรือพัง (สำคัญสุด):</b> ไปที่ Google Sheets -&gt; Extensions -&gt; Apps Script -&gt; กดปุ่ม <b>Deploy -&gt; New deployment</b> (ห้ามใช้ Manage Deployments เก่า)<br/>
                     2. ก่อน Deploy <b>สำคัญมาก:</b> ให้เลือกฟังก์ชัน <b>authorizeDrive</b> ด้านบนแล้วกด <b>เรียกใช้งาน (Run)</b> เพื่ออนุญาตสิทธิ์ Google Drive ให้เรียบร้อย<br/>
                     3. กด Deploy -&gt; New deployment และต้องเลือกระดับสิทธิ์เป็น <b>Who has access: "Anyone" (ทุกคน)</b> เท่านั้น<br/>
                     4. คัดลอก URL อันใหม่ล่าสุด ไปใส่ใน <b>VITE_GOOGLE_SHEET_URL</b> ในเว็บ Vercel แล้วกด Save และไปลบ Deploy อันเก่าใน Vercel ให้มันสร้างใหม่<br/>
-                    4. เช็คว่ามีแท็บใน Google Sheets ครบตามนี้: <b>Orders , Products , Settings , Admins , Schools , TrainingCenters</b> (ชื่อต้องเป๊ะทุกตัวอักษร)<br/>
-                    5. <b>เช็คว่าแท็บ Orders ว่างเปล่าหรือไม่:</b> ถ้าไม่มีหัวตารางเลย ให้พิมพ์ข้อความไว้ในแถวที่ 1 (เช่น id, date, ข้อมูลอื่นๆ) เพื่อไม่ให้ตารางพัง
+                    5. เช็คว่ามีแท็บใน Google Sheets ครบตามนี้: <b>Orders , Products , Settings , Admins , Schools , TrainingCenters</b> (ชื่อต้องเป๊ะทุกตัวอักษร)<br/>
+                    6. <b>เช็คว่าแท็บ Orders ว่างเปล่าหรือไม่:</b> ถ้าไม่มีหัวตารางเลย ให้พิมพ์ข้อความไว้ในแถวที่ 1 (เช่น id, date, ข้อมูลอื่นๆ) เพื่อไม่ให้ตารางพัง<br/>
+                    <br/>
+                    <span className="font-semibold text-red-700">รายละเอียด Error: {sheetError}</span>
                   </div>
                 )}
                 

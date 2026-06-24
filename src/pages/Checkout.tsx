@@ -120,7 +120,21 @@ export default function Checkout({ cart, paymentSettingsProp, onClearCart }: Che
         fetchFailed = true;
       } finally {
         if (!paymentSettingsProp && !paymentSettings) {
-           setPaymentSettings(prev => prev || { bankName: 'ธนาคารกรุงเทพ', accountNumber: '123-4-56789-0', accountName: 'ระบบขัดข้อง (กรุณาแจ้งแอดมิน)', shippingFee: 0, qrCodeUrl: '' });
+           let fbPaymentSet = null;
+           try {
+             fbPaymentSet = fallbackData.settings.find((s: any) => s.id === 'payment');
+           } catch (e) {}
+           if (fbPaymentSet) {
+             setPaymentSettings({
+              bankName: fbPaymentSet.bankName || 'ธนาคารกรุงเทพ',
+              accountNumber: fbPaymentSet.accountNumber || '123-4-56789-0',
+              accountName: fbPaymentSet.accountName || 'ระบบขัดข้อง (กรุณาแจ้งแอดมิน)',
+              shippingFee: Number(fbPaymentSet.shippingFee) || 0,
+              qrCodeUrl: fbPaymentSet.qrCodeUrl || '',
+             });
+           } else {
+             setPaymentSettings(prev => prev || { bankName: 'ธนาคารกรุงเทพ', accountNumber: '123-4-56789-0', accountName: 'ระบบขัดข้อง (กรุณาแจ้งแอดมิน)', shippingFee: 0, qrCodeUrl: '' });
+           }
         }
         setTrainingCenters(prev => {
           if (prev.length > 0) return prev;
