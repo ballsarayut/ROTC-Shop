@@ -350,6 +350,7 @@ export const googleSheetService = {
         },
         body: JSON.stringify({
           action: 'uploadFile',
+          sheet: 'Orders',
           payload: {
             base64: base64Data,
             mimeType,
