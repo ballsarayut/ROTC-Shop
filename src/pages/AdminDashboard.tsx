@@ -979,7 +979,7 @@ export default function AdminDashboard() {
     })();
 
     fetchOrders(!hasCache);
-    const intervalId = setInterval(() => fetchOrders(false), 45000); // 45s polling to safeguard free-tier Firestore quota from depletion
+    const intervalId = setInterval(() => fetchOrders(false), 15000); // 15s polling to safeguard free-tier Firestore quota from depletion
 
     // remove onSnapshot
     const unsubscribeOrders = () => {
@@ -5812,13 +5812,29 @@ export default function AdminDashboard() {
 
         {activeTab === "orders" && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
-            <div>
-              <h2 className="text-3xl font-black text-army-dark uppercase tracking-tighter mb-2">
-                จัดการคำสั่งซื้อ
-              </h2>
-              <p className="text-army-muted font-black uppercase tracking-normal text-xs">
-                ตรวจสอบและอัปเดตสถานะคำสั่งซื้อ
-              </p>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h2 className="text-3xl font-black text-army-dark uppercase tracking-tighter mb-2">
+                  จัดการคำสั่งซื้อ
+                </h2>
+                <p className="text-army-muted font-black uppercase tracking-normal text-xs">
+                  ตรวจสอบและอัปเดตสถานะคำสั่งซื้อ
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  try {
+                    localStorage.removeItem("admin_orders_cache");
+                  } catch (e) {}
+                  setOrders([]);
+                  setRefreshTrigger((prev) => prev + 1);
+                }}
+                disabled={loading}
+                className="flex items-center space-x-2 px-6 py-3 bg-army-dark text-white rounded-xl font-bold hover:bg-army-dark/90 transition-all disabled:opacity-50"
+              >
+                {loading ? <Loader2 className="animate-spin" size={18} /> : <RefreshCw size={18} />}
+                <span>{loading ? "กำลังอัปเดต..." : "อัปเดตข้อมูลล่าสุด"}</span>
+              </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -6950,7 +6966,13 @@ export default function AdminDashboard() {
         {activeTab === "embroidery" && (
           <EmbroideryManagement
             orders={orders}
-            onRefresh={() => setRefreshTrigger((prev) => prev + 1)}
+            onRefresh={() => {
+              try {
+                localStorage.removeItem("admin_orders_cache");
+              } catch (e) {}
+              setOrders([]);
+              setRefreshTrigger((prev) => prev + 1);
+            }}
             isRefreshing={loading}
           />
         )}
