@@ -7615,21 +7615,61 @@ export default function AdminDashboard() {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="relative max-w-4xl max-h-[90vh] flex flex-col items-center justify-center"
+              className="relative w-[90vw] max-w-4xl h-[90vh] flex flex-col items-center justify-center"
               onClick={(e) => e.stopPropagation()}
             >
               <button
                 onClick={() => setViewingSlipUrl(null)}
-                className="absolute -top-12 right-0 p-2 text-white hover:text-gray-300 transition-colors"
+                className="absolute -top-12 right-0 p-2 text-white hover:text-gray-300 transition-colors z-[120]"
               >
                 <X size={24} />
               </button>
-              <img
-                src={viewingSlipUrl}
-                alt="Slip"
-                className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
-                referrerPolicy="no-referrer"
-              />
+              {(() => {
+                const isDrive = viewingSlipUrl.includes('drive.google.com');
+                let embedUrl = viewingSlipUrl;
+                if (isDrive) {
+                  const match1 = viewingSlipUrl.match(/id=([a-zA-Z0-9_-]+)/);
+                  const match2 = viewingSlipUrl.match(/file\/d\/([a-zA-Z0-9_-]+)/);
+                  const id = match1 ? match1[1] : (match2 ? match2[1] : null);
+                  if (id) {
+                    embedUrl = `https://drive.google.com/file/d/${id}/preview`;
+                  }
+                }
+
+                if (isDrive) {
+                  return (
+                    <iframe
+                      src={embedUrl}
+                      className="w-full h-full rounded-lg shadow-2xl bg-white"
+                      allow="autoplay"
+                    ></iframe>
+                  );
+                }
+
+                return (
+                  <img
+                    src={viewingSlipUrl}
+                    alt="Slip"
+                    className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl bg-white"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                );
+              })()}
+              
+              <div className="mt-4 flex gap-4 flex-shrink-0">
+                <a
+                  href={viewingSlipUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-6 py-3 bg-white text-black rounded-xl font-bold flex items-center gap-2 hover:bg-gray-200 transition-colors shadow-lg"
+                >
+                  <ExternalLink size={20} />
+                  คลิกเพื่อเปิดลิ้งก์ในแท็บใหม่
+                </a>
+              </div>
             </motion.div>
           </div>
         )}
