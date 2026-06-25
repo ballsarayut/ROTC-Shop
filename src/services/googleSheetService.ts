@@ -12,31 +12,6 @@ export const getGoogleSheetUrl = () => SCRIPT_URL;
 
 const DEFAULT_URL = "https://script.google.com/macros/s/AKfycbyCb7Byo0Zn8-VtxQ-6xwy0K0UR42s_8U4zcUfR6ReFIlILZ18Nt-dvJLk1dd6VtgEI/exec";
 
-/**
- * Self-healing fetch that automatically falls back to the known working default sheet 
- * if the user's custom Vercel URL is broken (e.g., 404, CORS, or incorrect deployment)
- */
-async function resilientFetch(url: string, options?: RequestInit) {
-  try {
-    const res = await fetch(url, options);
-    // If the provided URL returns a 404 (common when users misconfigure their deployment)
-    // or if the URL was somehow completely invalid and we want to recover gracefully:
-    if (!res.ok && res.status === 404 && url.includes(SCRIPT_URL) && SCRIPT_URL !== DEFAULT_URL) {
-      console.warn(`[Self-Healing] Primary Google Sheets URL failed with 404. Auto-switching to default working URL...`);
-      const fallbackUrl = url.replace(SCRIPT_URL, DEFAULT_URL);
-      return await fetch(fallbackUrl, options);
-    }
-    return res;
-  } catch (error) {
-    if (url.includes(SCRIPT_URL) && SCRIPT_URL !== DEFAULT_URL) {
-      console.warn(`[Self-Healing] Primary Google Sheets URL fetch failed (likely CORS or network error). Auto-switching to default working URL...`);
-      const fallbackUrl = url.replace(SCRIPT_URL, DEFAULT_URL);
-      return await fetch(fallbackUrl, options);
-    }
-    throw error;
-  }
-}
-
 export const googleSheetService = {
   /**
    * Sync a single record to Google Sheets (Create or Update)
@@ -46,9 +21,6 @@ export const googleSheetService = {
       console.warn('VITE_GOOGLE_SHEET_URL is not defined. Skipping sync. Please redeploy if you just added it.');
       return;
     }
-
-    const DEFAULT_URL = "https://script.google.com/macros/s/AKfycbyCb7Byo0Zn8-VtxQ-6xwy0K0UR42s_8U4zcUfR6ReFIlILZ18Nt-dvJLk1dd6VtgEI/exec";
-    let targetUrl = SCRIPT_URL;
 
     try {
       let intendedIsEmbroidered: any = undefined;
@@ -91,33 +63,42 @@ export const googleSheetService = {
         }
       });
       
-      // Update ALL variation keys to standard representation so it updates the correct column in Apps Script
-      if (intendedIsEmbroidered !== undefined) {
-        const valStr = (intendedIsEmbroidered === true || intendedIsEmbroidered === 'true' || intendedIsEmbroidered === 'TRUE') ? "TRUE" : "FALSE";
-        let foundVariation = false;
-        Object.keys(sanitizedPayload).forEach(k => {
-          if (k.toLowerCase().trim() === 'isembroidered') {
-            sanitizedPayload[k] = valStr;
-            foundVariation = true;
+        // Update ALL variation keys to standard representation so it updates the correct column in Apps Script
+        if (intendedIsEmbroidered !== undefined) {
+          const valStr = (intendedIsEmbroidered === true || intendedIsEmbroidered === 'true' || intendedIsEmbroidered === 'TRUE') ? "TRUE" : "FALSE";
+          let foundVariation = false;
+          Object.keys(sanitizedPayload).forEach(k => {
+            if (k.toLowerCase().trim() === 'isembroidered' || k.includes('ปัก') || k.toLowerCase().trim() === 'ac') {
+              sanitizedPayload[k] = valStr;
+              foundVariation = true;
+            }
+          });
+          if (!foundVariation) {
+            sanitizedPayload['isEmbroidered'] = valStr;
           }
-        });
-        if (!foundVariation) {
-          sanitizedPayload['isEmbroidered'] = valStr;
+          // Always include common variations just in case the sheet headers are in Thai
+          sanitizedPayload['ปักแล้ว'] = valStr;
+          sanitizedPayload['สถานะปัก'] = valStr;
+          sanitizedPayload['AC'] = valStr;
+          sanitizedPayload['ac'] = valStr;
         }
-      }
-      if (intendedIsOrdered !== undefined) {
-        const valStr = (intendedIsOrdered === true || intendedIsOrdered === 'true' || intendedIsOrdered === 'TRUE') ? "TRUE" : "FALSE";
-        let foundVariation = false;
-        Object.keys(sanitizedPayload).forEach(k => {
-          if (k.toLowerCase().trim() === 'isordered') {
-            sanitizedPayload[k] = valStr;
-            foundVariation = true;
+        if (intendedIsOrdered !== undefined) {
+          const valStr = (intendedIsOrdered === true || intendedIsOrdered === 'true' || intendedIsOrdered === 'TRUE') ? "TRUE" : "FALSE";
+          let foundVariation = false;
+          Object.keys(sanitizedPayload).forEach(k => {
+            if (k.toLowerCase().trim() === 'isordered' || (k.includes('สั่ง') && !k.includes('คำสั่ง')) || k.toLowerCase().trim() === 'ab') {
+              sanitizedPayload[k] = valStr;
+              foundVariation = true;
+            }
+          });
+          if (!foundVariation) {
+            sanitizedPayload['isOrdered'] = valStr;
           }
-        });
-        if (!foundVariation) {
-          sanitizedPayload['isOrdered'] = valStr;
+          sanitizedPayload['สั่งแล้ว'] = valStr;
+          sanitizedPayload['สถานะสั่ง'] = valStr;
+          sanitizedPayload['AB'] = valStr;
+          sanitizedPayload['ab'] = valStr;
         }
-      }
 
       // Force write to both the X column and "หมายเหตุ" to guarantee it hits
       if (sanitizedPayload.remarks !== undefined) {
@@ -128,7 +109,7 @@ export const googleSheetService = {
         delete sanitizedPayload['remarks'];
       }
 
-      const response = await resilientFetch(SCRIPT_URL, {
+      const response = await fetch(SCRIPT_URL, {
         method: 'POST',
         // using text/plain prevents CORS preflight issues without losing the body
         headers: {
@@ -204,7 +185,7 @@ export const googleSheetService = {
           const valStr = (intendedIsEmbroidered === true || intendedIsEmbroidered === 'true' || intendedIsEmbroidered === 'TRUE') ? "TRUE" : "FALSE";
           let foundVariation = false;
           Object.keys(sanitizedPayload).forEach(k => {
-            if (k.toLowerCase().trim() === 'isembroidered') {
+            if (k.toLowerCase().trim() === 'isembroidered' || k.includes('ปัก') || k.toLowerCase().trim() === 'ab') {
               sanitizedPayload[k] = valStr;
               foundVariation = true;
             }
@@ -212,6 +193,10 @@ export const googleSheetService = {
           if (!foundVariation) {
             sanitizedPayload['isEmbroidered'] = valStr;
           }
+          sanitizedPayload['ปักแล้ว'] = valStr;
+          sanitizedPayload['สถานะปัก'] = valStr;
+          sanitizedPayload['AB'] = valStr;
+          sanitizedPayload['ab'] = valStr;
         }
 
         // Ensure all variations of isOrdered are updated
@@ -219,7 +204,7 @@ export const googleSheetService = {
           const valStr = (intendedIsOrdered === true || intendedIsOrdered === 'true' || intendedIsOrdered === 'TRUE') ? "TRUE" : "FALSE";
           let foundVariation = false;
           Object.keys(sanitizedPayload).forEach(k => {
-            if (k.toLowerCase().trim() === 'isordered') {
+            if (k.toLowerCase().trim() === 'isordered' || (k.includes('สั่ง') && !k.includes('คำสั่ง')) || k.toLowerCase().trim() === 'aa') {
               sanitizedPayload[k] = valStr;
               foundVariation = true;
             }
@@ -227,6 +212,10 @@ export const googleSheetService = {
           if (!foundVariation) {
             sanitizedPayload['isOrdered'] = valStr;
           }
+          sanitizedPayload['สั่งแล้ว'] = valStr;
+          sanitizedPayload['สถานะสั่ง'] = valStr;
+          sanitizedPayload['AA'] = valStr;
+          sanitizedPayload['aa'] = valStr;
         }
 
         // Force write to both the X column and "หมายเหตุ" to guarantee it hits
@@ -244,7 +233,7 @@ export const googleSheetService = {
       console.log(`[Batch Sync] Trying batchSync for ${sanitizedPayloads.length} records...`);
       let batchSucceeded = false;
       try {
-        const response = await resilientFetch(SCRIPT_URL, {
+        const response = await fetch(SCRIPT_URL, {
           method: 'POST',
           headers: {
             'Content-Type': 'text/plain;charset=utf-8',
@@ -252,7 +241,7 @@ export const googleSheetService = {
           body: JSON.stringify({
             action: 'batchSync',
             sheet,
-            payload: sanitizedPayloads,
+            payloads: sanitizedPayloads,
           }),
         });
 
@@ -280,7 +269,7 @@ export const googleSheetService = {
       let count = 0;
       for (const record of sanitizedPayloads) {
         try {
-          const response = await resilientFetch(SCRIPT_URL, {
+          const response = await fetch(SCRIPT_URL, {
             method: 'POST',
             headers: {
               'Content-Type': 'text/plain;charset=utf-8',
@@ -318,7 +307,7 @@ export const googleSheetService = {
     if (!SCRIPT_URL) return;
 
     try {
-      await resilientFetch(SCRIPT_URL, {
+      await fetch(SCRIPT_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'text/plain;charset=utf-8',
@@ -343,7 +332,7 @@ export const googleSheetService = {
     if (!SCRIPT_URL) throw new Error('VITE_GOOGLE_SHEET_URL is not configured');
 
     try {
-      const response = await resilientFetch(SCRIPT_URL, {
+      const response = await fetch(SCRIPT_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'text/plain;charset=utf-8',
@@ -381,16 +370,25 @@ export const googleSheetService = {
 
     try {
       const url = `${SCRIPT_URL}?action=read&sheet=${sheet}&_t=${Date.now()}`;
-      const response = await resilientFetch(url, { cache: 'no-store' });
+      const response = await fetch(url);
       if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
       let data;
       try {
-        data = await response.json();
-      } catch (err: any) {
-        if (response.status === 404) {
-          throw new Error('ระบบ Google บล็อกการเข้าถึง (404) - คุณยังไม่ได้ตั้งค่าสิทธิ์ให้เป็น "Anyone" (ทุกคน) ในตอนที่กด Deploy');
+        const text = await response.text();
+        try {
+          data = JSON.parse(text);
+        } catch (parseErr: any) {
+          console.error("Failed to parse JSON. Response text preview:", text.substring(0, 200));
+          if (text.includes("Sign in - Google Accounts") || text.includes("<title>Google Drive</title>")) {
+             throw new Error('Google บล็อกการเข้าถึง - คุณต้องตั้งค่าสิทธิ์ Apps Script เป็น "Anyone" (ทุกคน) ตอน Deploy หรือลองเปิดในหน้าต่างไม่ระบุตัวตน (Incognito)');
+          }
+          if (response.status === 404) {
+            throw new Error('ระบบ Google บล็อกการเข้าถึง (404) - คุณยังไม่ได้ตั้งค่าสิทธิ์ให้เป็น "Anyone" (ทุกคน) ในตอนที่กด Deploy');
+          }
+          throw new Error('URL ไม่ถูกต้อง หรือยังไม่ได้ตั้งค่าสิทธิ์ Apps Script เป็น "Anyone" (ทุกคน). กรุณาตรวจสอบการตั้งค่า Deploy ใน Apps Script.');
         }
-        throw new Error('URL ไม่ถูกต้อง หรือยังไม่ได้ตั้งค่าสิทธิ์ Apps Script เป็น "Anyone" (ทุกคน). กรุณาตรวจสอบการตั้งค่า Deploy ใน Apps Script.');
+      } catch (err: any) {
+        throw err;
       }
       if (data && data.error) {
         throw new Error(data.error);

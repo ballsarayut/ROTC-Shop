@@ -581,7 +581,7 @@ export default function AdminDashboard() {
         },
       });
       const link = document.createElement("a");
-      link.download = `order-tracking-${viewingTrackingOrder?.id.slice(0, 8) || "details"}.png`;
+      link.download = `order-tracking-${String(viewingTrackingOrder?.id).slice(0, 8) || "details"}.png`;
       link.href = dataUrl;
       link.click();
     } catch (err) {
@@ -620,7 +620,7 @@ export default function AdminDashboard() {
   const handleDeleteOrder = async (orderId: string) => {
     setConfirmModal({
       title: "ยืนยันการลบคำสั่งซื้อ",
-      message: `คุณแน่ใจหรือไม่ว่าต้องการลบคำสั่งซื้อ #${orderId.slice(0, 8).toUpperCase()}? การดำเนินการนี้ไม่สามารถย้อนกลับได้`,
+      message: `คุณแน่ใจหรือไม่ว่าต้องการลบคำสั่งซื้อ #${String(orderId).slice(0, 8).toUpperCase()}? การดำเนินการนี้ไม่สามารถย้อนกลับได้`,
       onConfirm: async () => {
         setLoading(true);
         try {
@@ -760,7 +760,7 @@ export default function AdminDashboard() {
     checkAuth();
 
     let isMounted = true;
-    const fetchOrders = async (showLoading = true) => {
+    const fetchOrders = async (showLoading = true, fetchFirebase = true) => {
       // @ts-ignore
       if (window._isSyncPaused) return; // Skip polling while bulk updating to prevent optimistic ui reversion
       if (showLoading) setLoading(true);
@@ -779,7 +779,7 @@ export default function AdminDashboard() {
         // 2. Fetch Firestore on-demand with a 1.2s Promise.race timeout so that even if the database is over quota,
         // it doesn't hang the UI load.
         try {
-          if (!isFirestoreQuotaExceeded()) {
+          if (fetchFirebase && !isFirestoreQuotaExceeded()) {
             const fbSnapshot = await Promise.race([
               getDocsFromServer(collection(db, "orders")),
               new Promise<null>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 1200))
@@ -798,8 +798,8 @@ export default function AdminDashboard() {
                 const d = docSnap.data();
                 if (d) {
                   firestoreStates[docSnap.id] = {
-                    isEmbroidered: d.isEmbroidered === true || d.isEmbroidered === "TRUE" || d.isEmbroidered === "true",
-                    isOrdered: d.isOrdered === true || d.isOrdered === "TRUE" || d.isOrdered === "true",
+                    isEmbroidered: d.isEmbroidered === true || String(d.isEmbroidered).toUpperCase() === "TRUE" || String(d.isEmbroidered) === "ปักแล้ว" || String(d.isEmbroidered) === "true",
+                    isOrdered: d.isOrdered === true || String(d.isOrdered).toUpperCase() === "TRUE" || String(d.isOrdered) === "สั่งแล้ว" || String(d.isOrdered) === "true",
                     school: d.school,
                     trainingCenter: d.trainingCenter,
                   };
@@ -837,12 +837,56 @@ export default function AdminDashboard() {
               }
             }
             const getBoolVal = (rec: any, key: string) => {
-              for (const k of Object.keys(rec)) {
-                if (k && k.toLowerCase().trim() === key.toLowerCase().trim()) {
-                  const val = rec[k];
-                  return val === true || val === "TRUE" || val === "true";
+              const checkVal = (v: any) => {
+                if (v === true || v === 1 || v === "1") return true;
+                if (typeof v === 'string') {
+                  const upper = v.trim().toUpperCase();
+                  return upper === 'TRUE' || upper === 'ปักแล้ว' || upper === 'สั่งแล้ว' || upper === 'YES' || upper === 'Y' || upper === 'ON' || upper === 'CHECKED';
                 }
+                return false;
+              };
+
+              if (key === 'isEmbroidered') {
+                 if (checkVal(rec['isEmbroidered'])) return true;
+                 if (checkVal(rec['AB'])) return true;
+                 if (checkVal(rec['ab'])) return true;
+                 if (checkVal(rec['ปักแล้ว'])) return true;
+                 if (checkVal(rec['สถานะปัก'])) return true;
+                 
+                 const vals = Object.values(rec);
+                 if (vals.length >= 28 && checkVal(vals[27])) return true; // AB is index 27 (0-based)
+                 
+                 for (const [k, v] of Object.entries(rec)) {
+                   const lowerK = k.toLowerCase().trim();
+                   if (lowerK.includes('ปัก') || lowerK === 'ab' || lowerK === 'isembroidered') {
+                     if (checkVal(v)) return true;
+                   }
+                 }
+                 
+                 for (const [k, v] of Object.entries(rec)) {
+                   if ((v === true || (typeof v === 'string' && v.trim().toUpperCase() === 'TRUE')) && 
+                       !['id', 'fullname', 'trainingcenter', 'school', 'items', 'status'].includes(k.toLowerCase().trim())) {
+                      return true;
+                   }
+                 }
+              } else if (key === 'isOrdered') {
+                 if (checkVal(rec['isOrdered'])) return true;
+                 if (checkVal(rec['AA'])) return true;
+                 if (checkVal(rec['aa'])) return true;
+                 if (checkVal(rec['สั่งแล้ว'])) return true;
+                 if (checkVal(rec['สถานะสั่ง'])) return true;
+                 
+                 const vals = Object.values(rec);
+                 if (vals.length >= 27 && checkVal(vals[26])) return true; // AA is index 26
+                 
+                 for (const [k, v] of Object.entries(rec)) {
+                   const lowerK = k.toLowerCase().trim();
+                   if ((lowerK.includes('สั่ง') && !lowerK.includes('คำสั่ง')) || lowerK === 'aa' || lowerK === 'isordered') {
+                     if (checkVal(v)) return true;
+                   }
+                 }
               }
+
               return false;
             };
 
@@ -860,7 +904,7 @@ export default function AdminDashboard() {
               return undefined;
             };
             
-            // 1. Core values from Sheets (Google Sheets is the absolute source of truth)
+            // 1. Core values from Sheets (Google Sheets is the absolute source of truth normally)
             let isEmbroideredVal = getBoolVal(record, "isEmbroidered");
             let isOrderedVal = getBoolVal(record, "isOrdered");
             let sheetSchool = getStrValMatch(record, ["school", "โรงเรียน"]);
@@ -868,10 +912,21 @@ export default function AdminDashboard() {
             
             // 2. Reconcile Firestore with Google Sheets state ONLY if Firestore states were successfully loaded.
             const fbState = firestoreStates[record.id];
+            
             if (fbState) {
+              // If Firebase has TRUE but Sheets has FALSE, we assume Firebase is more recent (user clicked in app)
+              // We should preserve the TRUE state in the app.
+              if (fbState.isEmbroidered === true && isEmbroideredVal === false) {
+                 isEmbroideredVal = true;
+              }
+              if (fbState.isOrdered === true && isOrderedVal === false) {
+                 isOrderedVal = true;
+              }
+              
               const updates: any = {};
-              if (fbState.isEmbroidered !== isEmbroideredVal) updates.isEmbroidered = isEmbroideredVal;
-              if (fbState.isOrdered !== isOrderedVal) updates.isOrdered = isOrderedVal;
+              // We only update Firebase if Sheets has a TRUTHY value that Firebase doesn't have
+              if (isEmbroideredVal === true && fbState.isEmbroidered !== true) updates.isEmbroidered = true;
+              if (isOrderedVal === true && fbState.isOrdered !== true) updates.isOrdered = true;
               if (sheetSchool !== undefined && fbState.school !== sheetSchool) updates.school = sheetSchool;
               if (sheetCenter !== undefined && fbState.trainingCenter !== sheetCenter) updates.trainingCenter = sheetCenter;
               
@@ -880,6 +935,20 @@ export default function AdminDashboard() {
                   console.warn("Error reconciling to Firestore:", e);
                 });
               }
+            } else if (!fetchFirebase) {
+              // If polling, preserve TRUE state from recent optimistic updates / cache to prevent flickering
+              try {
+                // @ts-ignore
+                const cachedOrdersStr = localStorage.getItem("admin_orders_cache");
+                if (cachedOrdersStr) {
+                  const cachedArr = JSON.parse(cachedOrdersStr);
+                  const cachedOrder = cachedArr.find((o: any) => o.id === record.id);
+                  if (cachedOrder) {
+                    if (cachedOrder.isEmbroidered === true && isEmbroideredVal === false) isEmbroideredVal = true;
+                    if (cachedOrder.isOrdered === true && isOrderedVal === false) isOrderedVal = true;
+                  }
+                }
+              } catch (e) {}
             } else if (didFetchFS && !isFirestoreQuotaExceeded()) {
               const updates: any = { isEmbroidered: isEmbroideredVal, isOrdered: isOrderedVal };
               if (sheetSchool !== undefined) updates.school = sheetSchool;
@@ -982,7 +1051,7 @@ export default function AdminDashboard() {
     })();
 
     fetchOrders(!hasCache);
-    const intervalId = setInterval(() => fetchOrders(false), 15000); // 15s polling to safeguard free-tier Firestore quota from depletion
+    const intervalId = setInterval(() => fetchOrders(false, false), 15000); // 15s polling to safeguard free-tier Firestore quota from depletion
 
     // remove onSnapshot
     const unsubscribeOrders = () => {
@@ -2259,7 +2328,7 @@ export default function AdminDashboard() {
           .sort((a, b) => a.fullName.localeCompare(b.fullName, "th"))
           .map((o) => ({
             id: o.id,
-            label: `${o.fullName} (${o.id.slice(0, 8).toUpperCase()})`,
+            label: `${o.fullName} (${String(o.id).slice(0, 8).toUpperCase()})`,
             isOrdered: o.isOrdered,
             isEmbroidered: o.isEmbroidered,
           }));
@@ -2298,7 +2367,7 @@ export default function AdminDashboard() {
       } else if (selectedType === "individual") {
         items = orders.map((o) => ({
           id: o.id,
-          label: `${o.fullName} (${o.id.slice(0, 8).toUpperCase()})`,
+          label: `${o.fullName} (${String(o.id).slice(0, 8).toUpperCase()})`,
           isOrdered: o.isOrdered,
           isEmbroidered: o.isEmbroidered,
         }));
@@ -2957,7 +3026,7 @@ export default function AdminDashboard() {
                         (o: any, i: number) => `
                       <tr>
                         <td>${chunk.startIndex + i + 1}</td>
-                        <td>${o.id.slice(0, 8).toUpperCase()}</td>
+                        <td>${String(o.id).slice(0, 8).toUpperCase()}</td>
                         <td>${o.fullName} ${(o.gender === 'ชาย' || o.gender === 'ช' || o.gender?.toLowerCase() === 'male' || o.gender?.toLowerCase() === 'm') ? '(ช)' : (o.gender === 'หญิง' || o.gender === 'ญ' || o.gender?.toLowerCase() === 'female' || o.gender?.toLowerCase() === 'f') ? '(ญ)' : ''}</td>
                         <td><div>${sortOrderItemsBySize(getFilteredItems(o.items)).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
                         <td>${formatPrice(getOrderAmount(o))}</td>
@@ -3000,7 +3069,7 @@ export default function AdminDashboard() {
                         (o: any, i: number) => `
                       <tr>
                         <td>${chunk.startIndex + i + 1}</td>
-                        <td>${o.id.slice(0, 8).toUpperCase()}</td>
+                        <td>${String(o.id).slice(0, 8).toUpperCase()}</td>
                         <td>${o.fullName} ${(o.gender === 'ชาย' || o.gender === 'ช' || o.gender?.toLowerCase() === 'male' || o.gender?.toLowerCase() === 'm') ? '(ช)' : (o.gender === 'หญิง' || o.gender === 'ญ' || o.gender?.toLowerCase() === 'female' || o.gender?.toLowerCase() === 'f') ? '(ญ)' : ''}</td>
                         <td><div>${sortOrderItemsBySize(getFilteredItems(o.items)).map((item: any) => `${item.name} (${formatItemSize(item.name, item.size)}) x ${item.quantity}`).join("</div><div>")}</div></td>
                         <td>${formatPrice(getOrderAmount(o))}</td>
@@ -3835,11 +3904,12 @@ export default function AdminDashboard() {
               <thead>
                 <tr>
                   <th style="width: 8%; border: 1px solid #1a2f23; background-color: #1a2f23 !important; color: white !important; font-weight: bold; padding: 6px 4px; font-size: 11px; text-align: center; box-shadow: inset 0 0 0 1000px #1a2f23;">ลำดับ</th>
-                  <th style="width: 35%; border: 1px solid #1a2f23; background-color: #1a2f23 !important; color: white !important; font-weight: bold; padding: 6px 10px; font-size: 11px; text-align: left; box-shadow: inset 0 0 0 1000px #1a2f23;">ชื่อ-นามสกุล</th>
+                  <th style="width: 30%; border: 1px solid #1a2f23; background-color: #1a2f23 !important; color: white !important; font-weight: bold; padding: 6px 10px; font-size: 11px; text-align: left; box-shadow: inset 0 0 0 1000px #1a2f23;">ชื่อ-นามสกุล</th>
                   <th style="width: 10%; border: 1px solid #1a2f23; background-color: #1a2f23 !important; color: white !important; font-weight: bold; padding: 6px 4px; font-size: 11px; text-align: center; box-shadow: inset 0 0 0 1000px #1a2f23;">ชั้นปี</th>
                   <th style="width: 10%; border: 1px solid #1a2f23; background-color: #1a2f23 !important; color: white !important; font-weight: bold; padding: 6px 4px; font-size: 11px; text-align: center; box-shadow: inset 0 0 0 1000px #1a2f23;">เพศ</th>
-                  <th style="width: 20%; border: 1px solid #1a2f23; background-color: #1a2f23 !important; color: white !important; font-weight: bold; padding: 6px 4px; font-size: 11px; text-align: center; box-shadow: inset 0 0 0 1000px #1a2f23;">เบอร์โทร</th>
-                  <th style="width: 17%; border: 1px solid #1a2f23; background-color: #1a2f23 !important; color: white !important; font-weight: bold; padding: 6px 4px; font-size: 11px; text-align: center; box-shadow: inset 0 0 0 1000px #1a2f23;">จำนวนที่สั่งปัก (ชุด)</th>
+                  <th style="width: 15%; border: 1px solid #1a2f23; background-color: #1a2f23 !important; color: white !important; font-weight: bold; padding: 6px 4px; font-size: 11px; text-align: center; box-shadow: inset 0 0 0 1000px #1a2f23;">เบอร์โทร</th>
+                  <th style="width: 12%; border: 1px solid #1a2f23; background-color: #1a2f23 !important; color: white !important; font-weight: bold; padding: 6px 4px; font-size: 11px; text-align: center; box-shadow: inset 0 0 0 1000px #1a2f23;">จำนวนที่สั่งปัก</th>
+                  <th style="width: 15%; border: 1px solid #1a2f23; background-color: #1a2f23 !important; color: white !important; font-weight: bold; padding: 6px 4px; font-size: 11px; text-align: center; box-shadow: inset 0 0 0 1000px #1a2f23;">สถานะ</th>
                 </tr>
               </thead>
               <tbody>
@@ -3847,6 +3917,8 @@ export default function AdminDashboard() {
                   .map(
                     (o, idx) => {
                       const absoluteIdx = (chunkIndex * MAX_ROWS) + idx + 1;
+                      const statusText = o.isEmbroidered ? "ปักแล้ว" : "ยังไม่ปัก";
+                      const statusColor = o.isEmbroidered ? "#059669" : "#d97706";
                       return `
                   <tr style="background-color: ${idx % 2 === 1 ? "#f8faf9" : "white"}; page-break-inside: avoid;">
                     <td style="border: 1px solid #cad4cf; padding: 6px 4px; text-align: center;">${absoluteIdx}</td>
@@ -3855,6 +3927,7 @@ export default function AdminDashboard() {
                     <td style="border: 1px solid #cad4cf; padding: 6px 4px; text-align: center;">${o.gender || "-"}</td>
                     <td style="border: 1px solid #cad4cf; padding: 6px 4px; text-align: center;">${o.phone || "-"}</td>
                     <td style="border: 1px solid #cad4cf; padding: 6px 4px; text-align: center; font-weight: bold; font-size: 12px; color: #1a2f23;">${getFishboneQuantity(o)}</td>
+                    <td style="border: 1px solid #cad4cf; padding: 6px 4px; text-align: center; font-weight: bold; font-size: 12px; color: ${statusColor};">${statusText}</td>
                   </tr>
                 `;
                     }
@@ -6092,7 +6165,7 @@ export default function AdminDashboard() {
                           />
                         </td>
                         <td className="px-6 py-4 font-mono text-xs font-black text-army-light group-hover:text-army-dark">
-                          #{order.id.slice(0, 8).toUpperCase()}
+                          #{String(order.id).slice(0, 8).toUpperCase()}
                         </td>
                         <td className="px-6 py-4">
                           <p className="text-xs font-black text-army-dark uppercase tracking-tight">
@@ -6489,7 +6562,7 @@ export default function AdminDashboard() {
                             </p>
                             <p className="text-2xl font-mono font-black">
                               #
-                              {viewingTrackingOrder.id
+                              {String(viewingTrackingOrder.id)
                                 .slice(0, 8)
                                 .toUpperCase()}
                             </p>

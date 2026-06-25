@@ -1,0 +1,49 @@
+776:        let firestoreStates: Record<string, { isEmbroidered?: boolean; isOrdered?: boolean; school?: string; trainingCenter?: string }> = {};
+801:                    isEmbroidered: d.isEmbroidered === true || String(d.isEmbroidered).toUpperCase() === "TRUE" || String(d.isEmbroidered) === "ปักแล้ว" || String(d.isEmbroidered) === "true",
+849:              if (key === 'isEmbroidered') {
+850:                 if (checkVal(rec['isEmbroidered'])) return true;
+912:            let isEmbroideredVal = getBoolVal(record, "isEmbroidered");
+923:              if (fbState.isEmbroidered === true && isEmbroideredVal === false) {
+924:                 isEmbroideredVal = true;
+932:              if (isEmbroideredVal === true && fbState.isEmbroidered !== true) updates.isEmbroidered = true;
+951:                    if (cachedOrder.isEmbroidered === true && isEmbroideredVal === false) isEmbroideredVal = true;
+957:              const updates: any = { isEmbroidered: isEmbroideredVal, isOrdered: isOrderedVal };
+969:              isEmbroideredVal = recentUpdate.value;
+990:              isEmbroidered: isEmbroideredVal,
+2295:            isEmbroidered:
+2296:              centerOrders.length > 0 && centerOrders.every((o) => o.isEmbroidered),
+2312:            isEmbroidered:
+2313:              schoolOrders.length > 0 && schoolOrders.every((o) => o.isEmbroidered),
+2326:            isEmbroidered:
+2327:              genderOrders.length > 0 && genderOrders.every((o) => o.isEmbroidered),
+2337:            isEmbroidered: o.isEmbroidered,
+2366:              isEmbroidered:
+2368:                productOrders.every((o) => o.isEmbroidered),
+2376:          isEmbroidered: o.isEmbroidered,
+2391:            isEmbroidered:
+2392:              yearOrders.length > 0 && yearOrders.every((o) => o.isEmbroidered),
+2414:        items = items.filter((item) => typeof item !== "string" && item.isEmbroidered === true);
+2416:        items = items.filter((item) => typeof item !== "string" && item.isEmbroidered !== true);
+3489:                const isEmbroidered = typeof item !== "string" && !!item.isEmbroidered;
+3593:      const newValue = !order.isEmbroidered;
+3601:      const updatedOrdersObj = orders.map((o) => (matchingIds.has(o.id) ? { ...o, isEmbroidered: newValue } : o));
+3622:          const payloadToSync: any = { ...o, isEmbroidered: newValue };
+3628:            await setDoc(doc(db,  "orders",  o.id), { isEmbroidered: newValue }, { merge: true });
+3639:        const revertedOrdersObj = orders.map((o) => (matchingIds.has(o.id) ? { ...o, isEmbroidered: !newValue } : o));
+3660:      const pending = ordersToMark.filter(o => !o.isEmbroidered);
+3667:            const updatedOrdersObj = orders.map((ord) => (updatedIds.has(ord.id) ? { ...ord, isEmbroidered: false } : ord));
+3689:                const payloadToSync: any = { ...o, isEmbroidered: false };
+3697:                  await setDoc(doc(db, "orders", o.id), { isEmbroidered: false }, { merge: true });
+3723:          const updatedOrdersObj = orders.map((ord) => (updatedIds.has(ord.id) ? { ...ord, isEmbroidered: true } : ord));
+3745:              const payloadToSync: any = { ...o, isEmbroidered: true };
+3753:                await setDoc(doc(db, "orders", o.id), { isEmbroidered: true }, { merge: true });
+3841:        orders: onlyNotEmbroidered ? group.orders.filter(o => !o.isEmbroidered) : group.orders,
+3850:      const unembroideredOrders = allDownloadedOrders.filter(o => !o.isEmbroidered);
+3924:                      const statusText = o.isEmbroidered ? "ปักแล้ว" : "ยังไม่ปัก";
+3925:                      const statusColor = o.isEmbroidered ? "#059669" : "#d97706";
+4023:            ).filter(o => !o.isEmbroidered);
+4028:            const updatedOrdersObj = orders.map((ord) => (updatedOrderIds.has(ord.id) ? { ...ord, isEmbroidered: true } : ord));
+4052:                  const payloadToSync: any = { ...o, isEmbroidered: true };
+4060:                    await setDoc(doc(db, "orders", o.id), { isEmbroidered: true }, { merge: true });
+4296:                                  order.isEmbroidered 
+4304:                                ) : order.isEmbroidered ? (

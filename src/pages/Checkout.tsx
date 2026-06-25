@@ -312,7 +312,11 @@ export default function Checkout({ cart, paymentSettingsProp, onClearCart }: Che
         } catch (uploadLibError) {
           console.error("Failed to upload via App Script:", uploadLibError);
           const msg = uploadLibError instanceof Error ? uploadLibError.message : String(uploadLibError);
-          throw new Error("อัพโหลดสลิปล้มเหลว: " + msg);
+          let errorPrompt = "อัพโหลดสลิปล้มเหลว: " + msg;
+          if (msg.includes("Invalid action") || msg.includes("404") || msg.includes("CORS")) {
+             errorPrompt = "⚠️ อัพโหลดสลิปไม่สำเร็จ: แอดมินยังไม่ได้อัพเดทโค้ด Apps Script (สคริปต์เก่าไม่มีฟังก์ชันอัพโหลด) กรุณาแจ้งแอดมินให้ไปที่หน้าระบบจัดการ -> คัดลอกโค้ด Apps Script อันใหม่ไป Deploy -> เซ็ตสิทธิ์เป็น Anyone -> และนำ URL ใหม่มาใส่";
+          }
+          throw new Error(errorPrompt);
         }
       }
 

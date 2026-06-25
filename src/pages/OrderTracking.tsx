@@ -235,7 +235,7 @@ export default function OrderTracking() {
                       </div>
                       <div className="text-center sm:text-right">
                         <p className="text-[10px] sm:text-base font-black uppercase tracking-widest opacity-70 mb-0.5 sm:mb-1">หมายเลขรายการ</p>
-                        <p className="text-lg sm:text-2xl font-mono font-black">#{order.id.slice(0, 8).toUpperCase()}</p>
+                        <p className="text-lg sm:text-2xl font-mono font-black">#{String(order.id).slice(0, 8).toUpperCase()}</p>
                       </div>
                     </div>
 
