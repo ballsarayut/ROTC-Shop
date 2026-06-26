@@ -76,12 +76,8 @@ export const googleSheetService = {
           if (!foundVariation) {
             sanitizedPayload['isEmbroidered'] = valStr;
           }
-          // Always include common variations just in case the sheet headers are in Thai
-          sanitizedPayload['ปักแล้ว'] = valStr;
-          sanitizedPayload['สถานะปัก'] = valStr;
-          sanitizedPayload['AC'] = valStr;
-          sanitizedPayload['ac'] = valStr;
         }
+
         if (intendedIsOrdered !== undefined) {
           const valStr = (intendedIsOrdered === true || intendedIsOrdered === 'true' || intendedIsOrdered === 'TRUE') ? "TRUE" : "FALSE";
           let foundVariation = false;
@@ -94,10 +90,6 @@ export const googleSheetService = {
           if (!foundVariation) {
             sanitizedPayload['isOrdered'] = valStr;
           }
-          sanitizedPayload['สั่งแล้ว'] = valStr;
-          sanitizedPayload['สถานะสั่ง'] = valStr;
-          sanitizedPayload['AB'] = valStr;
-          sanitizedPayload['ab'] = valStr;
         }
 
       // Force write to both the X column and "หมายเหตุ" to guarantee it hits
@@ -193,10 +185,6 @@ export const googleSheetService = {
           if (!foundVariation) {
             sanitizedPayload['isEmbroidered'] = valStr;
           }
-          sanitizedPayload['ปักแล้ว'] = valStr;
-          sanitizedPayload['สถานะปัก'] = valStr;
-          sanitizedPayload['AB'] = valStr;
-          sanitizedPayload['ab'] = valStr;
         }
 
         // Ensure all variations of isOrdered are updated
@@ -212,10 +200,6 @@ export const googleSheetService = {
           if (!foundVariation) {
             sanitizedPayload['isOrdered'] = valStr;
           }
-          sanitizedPayload['สั่งแล้ว'] = valStr;
-          sanitizedPayload['สถานะสั่ง'] = valStr;
-          sanitizedPayload['AA'] = valStr;
-          sanitizedPayload['aa'] = valStr;
         }
 
         // Force write to both the X column and "หมายเหตุ" to guarantee it hits
