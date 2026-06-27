@@ -66,30 +66,12 @@ export const googleSheetService = {
         // Update ALL variation keys to standard representation so it updates the correct column in Apps Script
         if (intendedIsEmbroidered !== undefined) {
           const valStr = (intendedIsEmbroidered === true || intendedIsEmbroidered === 'true' || intendedIsEmbroidered === 'TRUE') ? "TRUE" : "FALSE";
-          let foundVariation = false;
-          Object.keys(sanitizedPayload).forEach(k => {
-            if (k.toLowerCase().trim() === 'isembroidered' || k.includes('ปัก') || k.toLowerCase().trim() === 'ac') {
-              sanitizedPayload[k] = valStr;
-              foundVariation = true;
-            }
-          });
-          if (!foundVariation) {
-            sanitizedPayload['isEmbroidered'] = valStr;
-          }
+          sanitizedPayload['isEmbroidered'] = valStr;
         }
 
         if (intendedIsOrdered !== undefined) {
           const valStr = (intendedIsOrdered === true || intendedIsOrdered === 'true' || intendedIsOrdered === 'TRUE') ? "TRUE" : "FALSE";
-          let foundVariation = false;
-          Object.keys(sanitizedPayload).forEach(k => {
-            if (k.toLowerCase().trim() === 'isordered' || (k.includes('สั่ง') && !k.includes('คำสั่ง')) || k.toLowerCase().trim() === 'ab') {
-              sanitizedPayload[k] = valStr;
-              foundVariation = true;
-            }
-          });
-          if (!foundVariation) {
-            sanitizedPayload['isOrdered'] = valStr;
-          }
+          sanitizedPayload['isOrdered'] = valStr;
         }
 
       // Force write to both the X column and "หมายเหตุ" to guarantee it hits
@@ -101,9 +83,16 @@ export const googleSheetService = {
         delete sanitizedPayload['remarks'];
       }
 
-      const response = await fetch(SCRIPT_URL, {
+      // Clean up garbage columns created by previous bugs
+      const garbageKeys = ['ปักแล้ว', 'สถานะปัก', 'AC', 'ac', 'สั่งแล้ว', 'สถานะสั่ง', 'AB', 'ab', 'AA', 'aa'];
+      garbageKeys.forEach(k => {
+        delete sanitizedPayload[k];
+      });
+
+      const targetUrl = SCRIPT_URL;
+      const proxyUrl = `/api/post-sheet-proxy?url=${encodeURIComponent(targetUrl)}`;
+      const response = await fetch(proxyUrl, {
         method: 'POST',
-        // using text/plain prevents CORS preflight issues without losing the body
         headers: {
           'Content-Type': 'text/plain;charset=utf-8',
         },
@@ -175,31 +164,13 @@ export const googleSheetService = {
         // Ensure all variations of isEmbroidered are updated
         if (intendedIsEmbroidered !== undefined) {
           const valStr = (intendedIsEmbroidered === true || intendedIsEmbroidered === 'true' || intendedIsEmbroidered === 'TRUE') ? "TRUE" : "FALSE";
-          let foundVariation = false;
-          Object.keys(sanitizedPayload).forEach(k => {
-            if (k.toLowerCase().trim() === 'isembroidered' || k.includes('ปัก') || k.toLowerCase().trim() === 'ab') {
-              sanitizedPayload[k] = valStr;
-              foundVariation = true;
-            }
-          });
-          if (!foundVariation) {
-            sanitizedPayload['isEmbroidered'] = valStr;
-          }
+          sanitizedPayload['isEmbroidered'] = valStr;
         }
 
         // Ensure all variations of isOrdered are updated
         if (intendedIsOrdered !== undefined) {
           const valStr = (intendedIsOrdered === true || intendedIsOrdered === 'true' || intendedIsOrdered === 'TRUE') ? "TRUE" : "FALSE";
-          let foundVariation = false;
-          Object.keys(sanitizedPayload).forEach(k => {
-            if (k.toLowerCase().trim() === 'isordered' || (k.includes('สั่ง') && !k.includes('คำสั่ง')) || k.toLowerCase().trim() === 'aa') {
-              sanitizedPayload[k] = valStr;
-              foundVariation = true;
-            }
-          });
-          if (!foundVariation) {
-            sanitizedPayload['isOrdered'] = valStr;
-          }
+          sanitizedPayload['isOrdered'] = valStr;
         }
 
         // Force write to both the X column and "หมายเหตุ" to guarantee it hits
@@ -211,13 +182,21 @@ export const googleSheetService = {
           delete sanitizedPayload['remarks'];
         }
 
+        // Clean up garbage columns created by previous bugs so they don't get recreated in GAS
+        const garbageKeys = ['ปักแล้ว', 'สถานะปัก', 'AC', 'ac', 'สั่งแล้ว', 'สถานะสั่ง', 'AB', 'ab', 'AA', 'aa'];
+        garbageKeys.forEach(k => {
+          delete sanitizedPayload[k];
+        });
+
         return sanitizedPayload;
       });
 
       console.log(`[Batch Sync] Trying batchSync for ${sanitizedPayloads.length} records...`);
       let batchSucceeded = false;
       try {
-        const response = await fetch(SCRIPT_URL, {
+        const targetUrl = SCRIPT_URL;
+        const proxyUrl = `/api/post-sheet-proxy?url=${encodeURIComponent(targetUrl)}`;
+        const response = await fetch(proxyUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'text/plain;charset=utf-8',
@@ -253,7 +232,9 @@ export const googleSheetService = {
       let count = 0;
       for (const record of sanitizedPayloads) {
         try {
-          const response = await fetch(SCRIPT_URL, {
+          const targetUrl = SCRIPT_URL;
+          const proxyUrl = `/api/post-sheet-proxy?url=${encodeURIComponent(targetUrl)}`;
+          const response = await fetch(proxyUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'text/plain;charset=utf-8',
@@ -291,7 +272,9 @@ export const googleSheetService = {
     if (!SCRIPT_URL) return;
 
     try {
-      await fetch(SCRIPT_URL, {
+      const targetUrl = SCRIPT_URL;
+      const proxyUrl = `/api/post-sheet-proxy?url=${encodeURIComponent(targetUrl)}`;
+      await fetch(proxyUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'text/plain;charset=utf-8',
@@ -316,7 +299,9 @@ export const googleSheetService = {
     if (!SCRIPT_URL) throw new Error('VITE_GOOGLE_SHEET_URL is not configured');
 
     try {
-      const response = await fetch(SCRIPT_URL, {
+      const targetUrl = SCRIPT_URL;
+      const proxyUrl = `/api/post-sheet-proxy?url=${encodeURIComponent(targetUrl)}`;
+      const response = await fetch(proxyUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'text/plain;charset=utf-8',
@@ -353,8 +338,9 @@ export const googleSheetService = {
     }
 
     try {
-      const url = `${SCRIPT_URL}?action=read&sheet=${sheet}&_t=${Date.now()}`;
-      const response = await fetch(url);
+      const targetUrl = `${SCRIPT_URL}?action=read&sheet=${sheet}&_t=${Date.now()}`;
+      const proxyUrl = `/api/fetch-sheet-proxy?url=${encodeURIComponent(targetUrl)}`;
+      const response = await fetch(proxyUrl);
       if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
       let data;
       try {

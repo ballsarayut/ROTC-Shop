@@ -398,18 +398,11 @@ export default function AdminDashboard() {
       base64Image = parts[1];
     } else if (slipData.startsWith("http")) {
       try {
-        const response = await fetch(slipData);
-        if (!response.ok) throw new Error("Failed to fetch image");
-        const blob = await response.blob();
-        mimeType = blob.type || "image/jpeg";
-        const reader = new FileReader();
-        base64Image = await new Promise((resolve) => {
-          reader.onloadend = () => {
-            const result = reader.result as string;
-            resolve(result.split(",")[1]);
-          };
-          reader.readAsDataURL(blob);
-        });
+        const response = await fetch(`/api/fetch-image?url=${encodeURIComponent(slipData)}`);
+        if (!response.ok) throw new Error("Failed to fetch image proxy");
+        const proxyData = await response.json();
+        base64Image = proxyData.base64;
+        mimeType = proxyData.mimeType || "image/jpeg";
       } catch (err) {
         console.error("Cannot fetch slip image", err);
         if (!isAuto)

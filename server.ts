@@ -105,6 +105,53 @@ async function startServer() {
     }
   });
 
+  app.get('/api/fetch-image', async (req, res) => {
+    const url = req.query.url as string;
+    if (!url) return res.status(400).send("No URL provided");
+    try {
+      const fetchRes = await fetch(url);
+      if (!fetchRes.ok) throw new Error("Failed to fetch");
+      const buffer = await fetchRes.arrayBuffer();
+      const base64 = Buffer.from(buffer).toString('base64');
+      res.json({ base64, mimeType: fetchRes.headers.get('content-type') || 'image/jpeg' });
+    } catch (e) {
+      console.error('Proxy image fetch error:', e);
+      res.status(500).json({ error: "Cannot fetch image" });
+    }
+  });
+
+  app.get('/api/fetch-sheet-proxy', async (req, res) => {
+    const url = req.query.url as string;
+    if (!url) return res.status(400).send("No URL provided");
+    try {
+      const response = await fetch(url, { redirect: 'follow' });
+      if (!response.ok) throw new Error("Proxy fetch failed");
+      const data = await response.text();
+      res.send(data);
+    } catch(e) {
+      console.error(e);
+      res.status(500).json({ error: "Failed to fetch from sheets" });
+    }
+  });
+
+  app.post('/api/post-sheet-proxy', async (req, res) => {
+    const url = req.query.url as string;
+    if (!url) return res.status(400).send("No URL provided");
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: typeof req.body === 'string' ? req.body : JSON.stringify(req.body),
+        redirect: 'follow'
+      });
+      const data = await response.text();
+      res.send(data);
+    } catch(e) {
+      console.error(e);
+      res.status(500).json({ error: "Failed to post to sheets" });
+    }
+  });
+
   app.post('/api/verify-slip', async (req, res) => {
     try {
       const { base64Image, mimeType, expectedAmount, expectedAccountName } = req.body;
