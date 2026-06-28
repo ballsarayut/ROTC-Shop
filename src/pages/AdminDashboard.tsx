@@ -1700,51 +1700,53 @@ export default function AdminDashboard() {
     });
   };
 
-  const filteredOrders = orders
-    .filter((o) => {
-      const matchesStatus = filterStatus === "all" || o.status === filterStatus;
-      const matchesSearch =
-        String(o.fullName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-        String(o.id || "").toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCenter =
-        filterCenter === "all" || o.trainingCenter === filterCenter;
-      const matchesSchool = filterSchool === "all" || o.school === filterSchool;
-      const matchesGender = filterGender === "all" || o.gender === filterGender;
-      const hasMatchingItem = o.items.some((item) => {
-        const pMatch = filterProduct === "all" || item.name === filterProduct;
-        const sMatch = filterSize === "all" || item.size === filterSize;
-        return pMatch && sMatch;
-      });
-      const matchesDate = !filterDate ? true : (() => {
-        try {
-          const dateToCompare = o.createdAt?.toDate ? o.createdAt.toDate() : new Date(o.createdAt);
-          return format(dateToCompare, "yyyy-MM-dd") === format(filterDate, "yyyy-MM-dd");
-        } catch(e) {
-          return false;
+  const filteredOrders = useMemo(() => {
+    return orders
+      .filter((o) => {
+        const matchesStatus = filterStatus === "all" || o.status === filterStatus;
+        const matchesSearch =
+          String(o.fullName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+          String(o.id || "").toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesCenter =
+          filterCenter === "all" || o.trainingCenter === filterCenter;
+        const matchesSchool = filterSchool === "all" || o.school === filterSchool;
+        const matchesGender = filterGender === "all" || o.gender === filterGender;
+        const hasMatchingItem = o.items.some((item) => {
+          const pMatch = filterProduct === "all" || item.name === filterProduct;
+          const sMatch = filterSize === "all" || item.size === filterSize;
+          return pMatch && sMatch;
+        });
+        const matchesDate = !filterDate ? true : (() => {
+          try {
+            const dateToCompare = o.createdAt?.toDate ? o.createdAt.toDate() : new Date(o.createdAt);
+            return format(dateToCompare, "yyyy-MM-dd") === format(filterDate, "yyyy-MM-dd");
+          } catch(e) {
+            return false;
+          }
+        })();
+        return (
+          matchesStatus &&
+          matchesSearch &&
+          matchesCenter &&
+          matchesSchool &&
+          matchesGender &&
+          hasMatchingItem &&
+          matchesDate
+        );
+      })
+      .sort((a, b) => {
+        if (!sortOrder) {
+          const dateA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt || 0).getTime() || 0;
+          const dateB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt || 0).getTime() || 0;
+          return dateB - dateA;
         }
-      })();
-      return (
-        matchesStatus &&
-        matchesSearch &&
-        matchesCenter &&
-        matchesSchool &&
-        matchesGender &&
-        hasMatchingItem &&
-        matchesDate
-      );
-    })
-    .sort((a, b) => {
-      if (!sortOrder) {
-        const dateA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt || 0).getTime() || 0;
-        const dateB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt || 0).getTime() || 0;
-        return dateB - dateA;
-      }
-      const nameA = String(a.fullName || "").toLowerCase();
-      const nameB = String(b.fullName || "").toLowerCase();
-      return sortOrder === "asc"
-        ? nameA.localeCompare(nameB, "th")
-        : nameB.localeCompare(nameA, "th");
-    });
+        const nameA = String(a.fullName || "").toLowerCase();
+        const nameB = String(b.fullName || "").toLowerCase();
+        return sortOrder === "asc"
+          ? nameA.localeCompare(nameB, "th")
+          : nameB.localeCompare(nameA, "th");
+      });
+  }, [orders, filterStatus, searchQuery, filterCenter, filterSchool, filterGender, filterProduct, filterSize, filterDate, sortOrder]);
 
   const duplicateSlips = useMemo(() => {
     const slipCounts = new Map<string, string[]>();
@@ -1766,52 +1768,58 @@ export default function AdminDashboard() {
         .filter(([_, orderIds]) => orderIds.length > 1)
         .map(([slip]) => slip),
     );
+  }, [orders, recoveredSlips]);
+
+  const trackingOrders = useMemo(() => {
+    return orders.filter(
+      (o) => o.status === "preparing" || o.status === "completed",
+    );
   }, [orders]);
 
-  const trackingOrders = orders.filter(
-    (o) => o.status === "preparing" || o.status === "completed",
-  );
-
-  const stats = {
-    totalSales: filteredOrders
-      .filter((o) => o.status !== "cancelled")
-      .reduce((sum, o) => sum + getOrderAmount(o), 0),
-    pendingOrders: filteredOrders.filter(
-      (o) => o.status === "pending" || o.status === "verifying",
-    ).length,
-    completedOrders: filteredOrders.filter((o) => o.status === "completed")
-      .length,
-    totalOrders: filteredOrders.length,
-  };
+  const stats = useMemo(() => {
+    return {
+      totalSales: filteredOrders
+        .filter((o) => o.status !== "cancelled")
+        .reduce((sum, o) => sum + getOrderAmount(o), 0),
+      pendingOrders: filteredOrders.filter(
+        (o) => o.status === "pending" || o.status === "verifying",
+      ).length,
+      completedOrders: filteredOrders.filter((o) => o.status === "completed")
+        .length,
+      totalOrders: filteredOrders.length,
+    };
+  }, [filteredOrders]);
 
   // Chart Data
-  const chartData = Object.entries(
-    filteredOrders.reduce(
-      (acc, o) => {
-        let date = "Unknown";
-        if (o.createdAt) {
-          try {
-            const d = o.createdAt.toDate
-              ? o.createdAt.toDate()
-              : new Date(o.createdAt);
-            date = format(
-              d,
-              revenueFilter === "daily"
-                ? "dd/MM"
-                : revenueFilter === "monthly"
-                  ? "MM/yyyy"
-                  : "yyyy",
-            );
-          } catch (e) {}
-        }
-        acc[date] = (acc[date] || 0) + getOrderAmount(o);
-        return acc;
-      },
-      {} as Record<string, number>,
-    ),
-  )
-    .map(([name, amount]) => ({ name, amount }))
-    .slice(-10);
+  const chartData = useMemo(() => {
+    return Object.entries(
+      filteredOrders.reduce(
+        (acc, o) => {
+          let date = "Unknown";
+          if (o.createdAt) {
+            try {
+              const d = o.createdAt.toDate
+                ? o.createdAt.toDate()
+                : new Date(o.createdAt);
+              date = format(
+                d,
+                revenueFilter === "daily"
+                  ? "dd/MM"
+                  : revenueFilter === "monthly"
+                    ? "MM/yyyy"
+                    : "yyyy",
+              );
+            } catch (e) {}
+          }
+          acc[date] = (acc[date] || 0) + getOrderAmount(o);
+          return acc;
+        },
+        {} as Record<string, number>,
+      ),
+    )
+      .map(([name, amount]) => ({ name, amount }))
+      .slice(-10);
+  }, [filteredOrders, revenueFilter]);
 
   const renderSidebar = () => (
     <div
@@ -2129,6 +2137,11 @@ export default function AdminDashboard() {
     const [isUndoing, setIsUndoing] = useState<string | null>(null);
     const [orderedFilter, setOrderedFilter] = useState<"all" | "ordered" | "not_ordered">("all");
     const [embroideredFilter, setEmbroideredFilter] = useState<"all" | "embroidered" | "not_embroidered">("all");
+    const [visibleCount, setVisibleCount] = useState(100);
+
+    useEffect(() => {
+      setVisibleCount(100);
+    }, [selectedType, searchQuery, orderedFilter, embroideredFilter]);
 
     const handleSetItemOrderedStatus = async (itemId: string, targetValue: boolean, e: React.MouseEvent) => {
       e.stopPropagation();
@@ -3470,93 +3483,112 @@ export default function AdminDashboard() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[500px] overflow-y-auto p-2">
-              {getAvailableItems().map((item) => {
-                const id = typeof item === "string" ? item : item.id;
-                const label = typeof item === "string" ? item : item.label;
-                const isSelected = selectedItems.has(id);
-                const isOrdered = typeof item !== "string" && !!item.isOrdered;
-                const isEmbroidered = typeof item !== "string" && !!item.isEmbroidered;
-
+              {(() => {
+                const availableItems = getAvailableItems();
+                const displayedItems = availableItems.slice(0, visibleCount);
                 return (
-                  <button
-                    key={id}
-                    onClick={() => toggleItem(id)}
-                    className={cn(
-                      "flex items-start space-x-3 p-4 rounded-2xl border-2 transition-all text-left h-full relative",
-                      isSelected
-                        ? "bg-army-dark border-army-dark text-white shadow-lg"
-                        : "bg-army-bg border-army-bg text-army-dark hover:border-army-light",
+                  <>
+                    {displayedItems.map((item) => {
+                      const id = typeof item === "string" ? item : item.id;
+                      const label = typeof item === "string" ? item : item.label;
+                      const isSelected = selectedItems.has(id);
+                      const isOrdered = typeof item !== "string" && !!item.isOrdered;
+                      const isEmbroidered = typeof item !== "string" && !!item.isEmbroidered;
+
+                      return (
+                        <button
+                          key={id}
+                          onClick={() => toggleItem(id)}
+                          className={cn(
+                            "flex items-start space-x-3 p-4 rounded-2xl border-2 transition-all text-left h-full relative",
+                            isSelected
+                              ? "bg-army-dark border-army-dark text-white shadow-lg"
+                              : "bg-army-bg border-army-bg text-army-dark hover:border-army-light",
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all shrink-0 mt-0.5",
+                              isSelected
+                                ? "bg-white border-white text-army-dark"
+                                : "bg-white border-army-light",
+                            )}
+                          >
+                            {isSelected && <CheckCircle2 size={14} />}
+                          </div>
+                          <div className="flex flex-col h-full justify-between items-start w-full pr-6">
+                            <span className={cn(
+                              "font-bold text-sm leading-tight break-words mb-2",
+                              isSelected ? "text-white" : "text-army-dark"
+                            )}>
+                              {label}
+                            </span>
+                            <div className="flex flex-wrap gap-1.5 mt-auto">
+                              <span className={cn(
+                                "px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider",
+                                isOrdered 
+                                  ? (isSelected ? "bg-white/10 text-emerald-300" : "bg-emerald-100 text-emerald-800")
+                                  : (isSelected ? "bg-white/10 text-amber-300" : "bg-amber-100 text-amber-800")
+                              )}>
+                                {isOrdered ? "สั่งซื้อแล้ว" : "ยังไม่สั่งซื้อ"}
+                              </span>
+                            </div>
+                          </div>
+                           {isOrdered ? (
+                            <div 
+                              className={cn(
+                                "absolute top-2 right-2 group/badge p-1 rounded-full shadow-sm transition-colors z-10",
+                                isSelected 
+                                  ? "text-emerald-300 bg-white/10 hover:bg-white/20 hover:text-red-300" 
+                                  : "text-emerald-500 bg-emerald-100 hover:bg-red-100 hover:text-red-600"
+                              )}
+                              title="สั่งซื้อแล้ว (คลิกเพื่อยกเลิก)"
+                              onClick={(e) => handleSetItemOrderedStatus(id, false, e)}
+                            >
+                              {isUndoing === id ? (
+                                <Loader2 size={14} className="animate-spin text-red-500" />
+                              ) : (
+                                <>
+                                  <Check size={14} className="group-hover/badge:hidden" />
+                                  <X size={14} className="hidden group-hover/badge:block" />
+                                </>
+                              )}
+                            </div>
+                          ) : (
+                            <div 
+                              className={cn(
+                                "absolute top-2 right-2 group/badge p-1 rounded-full shadow-sm transition-colors z-10",
+                                isSelected 
+                                  ? "text-amber-300/60 bg-white/5 hover:bg-white/10 hover:text-white" 
+                                  : "text-gray-400 bg-gray-100 hover:bg-emerald-100 hover:text-emerald-600"
+                              )}
+                              title="ยังไม่ได้สั่งซื้อ (คลิกเพื่อตั้งว่าสั่งซื้อแล้ว)"
+                              onClick={(e) => handleSetItemOrderedStatus(id, true, e)}
+                            >
+                              {isUndoing === id ? (
+                                <Loader2 size={14} className="animate-spin text-emerald-500" />
+                              ) : (
+                                <ShoppingCart size={14} />
+                              )}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                    {availableItems.length > visibleCount && (
+                      <div className="col-span-full flex justify-center py-4">
+                        <button
+                          type="button"
+                          onClick={() => setVisibleCount((prev) => prev + 200)}
+                          className="px-6 py-2.5 bg-army-dark hover:bg-army-dark/95 text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer"
+                        >
+                          แสดงเพิ่มเติม (+200 รายการ) (แสดงอยู่ {visibleCount} จาก {availableItems.length} รายการ)
+                        </button>
+                      </div>
                     )}
-                  >
-                    <div
-                      className={cn(
-                        "w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all shrink-0 mt-0.5",
-                        isSelected
-                          ? "bg-white border-white text-army-dark"
-                          : "bg-white border-army-light",
-                      )}
-                    >
-                      {isSelected && <CheckCircle2 size={14} />}
-                    </div>
-                    <div className="flex flex-col h-full justify-between items-start w-full pr-6">
-                      <span className={cn(
-                        "font-bold text-sm leading-tight break-words mb-2",
-                        isSelected ? "text-white" : "text-army-dark"
-                      )}>
-                        {label}
-                      </span>
-                      <div className="flex flex-wrap gap-1.5 mt-auto">
-                        <span className={cn(
-                          "px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider",
-                          isOrdered 
-                            ? (isSelected ? "bg-white/10 text-emerald-300" : "bg-emerald-100 text-emerald-800")
-                            : (isSelected ? "bg-white/10 text-amber-300" : "bg-amber-100 text-amber-800")
-                        )}>
-                          {isOrdered ? "สั่งซื้อแล้ว" : "ยังไม่สั่งซื้อ"}
-                        </span>
-                      </div>
-                    </div>
-                     {isOrdered ? (
-                      <div 
-                        className={cn(
-                          "absolute top-2 right-2 group/badge p-1 rounded-full shadow-sm transition-colors z-10",
-                          isSelected 
-                            ? "text-emerald-300 bg-white/10 hover:bg-white/20 hover:text-red-300" 
-                            : "text-emerald-500 bg-emerald-100 hover:bg-red-100 hover:text-red-600"
-                        )}
-                        title="สั่งซื้อแล้ว (คลิกเพื่อยกเลิก)"
-                        onClick={(e) => handleSetItemOrderedStatus(id, false, e)}
-                      >
-                        {isUndoing === id ? (
-                          <Loader2 size={14} className="animate-spin text-red-500" />
-                        ) : (
-                          <>
-                            <Check size={14} className="group-hover/badge:hidden" />
-                            <X size={14} className="hidden group-hover/badge:block" />
-                          </>
-                        )}
-                      </div>
-                    ) : (
-                      <div 
-                        className={cn(
-                          "absolute top-2 right-2 group/badge p-1 rounded-full shadow-sm transition-colors z-10",
-                          isSelected 
-                            ? "text-amber-300/60 bg-white/5 hover:bg-white/10 hover:text-white" 
-                            : "text-gray-400 bg-gray-100 hover:bg-emerald-100 hover:text-emerald-600"
-                        )}
-                        title="ยังไม่ได้สั่งซื้อ (คลิกเพื่อตั้งว่าสั่งซื้อแล้ว)"
-                        onClick={(e) => handleSetItemOrderedStatus(id, true, e)}
-                      >
-                        {isUndoing === id ? (
-                          <Loader2 size={14} className="animate-spin text-emerald-500" />
-                        ) : (
-                          <ShoppingCart size={14} />
-                        )}
-                      </div>
-                    )}
-                  </button>
+                  </>
                 );
-              })}
+              })()}
             </div>
           </div>
         )}
