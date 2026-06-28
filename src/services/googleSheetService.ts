@@ -4,7 +4,15 @@
  * Service to handle synchronization with Google Sheets via Google Apps Script
  */
 
-const SCRIPT_URL = import.meta.env.VITE_GOOGLE_SHEET_URL || "https://script.google.com/macros/s/AKfycbyCb7Byo0Zn8-VtxQ-6xwy0K0UR42s_8U4zcUfR6ReFIlILZ18Nt-dvJLk1dd6VtgEI/exec";
+const getValidScriptUrl = () => {
+  let url = import.meta.env.VITE_GOOGLE_SHEET_URL;
+  if (!url || url === 'undefined' || url === 'null' || url.trim() === '') {
+    return "https://script.google.com/macros/s/AKfycbyCb7Byo0Zn8-VtxQ-6xwy0K0UR42s_8U4zcUfR6ReFIlILZ18Nt-dvJLk1dd6VtgEI/exec";
+  }
+  return url;
+};
+
+const SCRIPT_URL = getValidScriptUrl();
 
 export type SheetName = 'Orders' | 'Products' | 'Settings' | 'Admins' | 'Schools' | 'TrainingCenters';
 
@@ -342,24 +350,25 @@ export const googleSheetService = {
       const proxyUrl = `/api/fetch-sheet-proxy?url=${encodeURIComponent(targetUrl)}`;
       const response = await fetch(proxyUrl);
       if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
+      
+      const text = await response.text();
       let data;
       try {
-        const text = await response.text();
-        try {
-          data = JSON.parse(text);
-        } catch (parseErr: any) {
-          console.error("Failed to parse JSON. Response text preview:", text.substring(0, 200));
-          if (text.includes("Sign in - Google Accounts") || text.includes("<title>Google Drive</title>")) {
-             throw new Error('Google บล็อกการเข้าถึง - คุณต้องตั้งค่าสิทธิ์ Apps Script เป็น "Anyone" (ทุกคน) ตอน Deploy หรือลองเปิดในหน้าต่างไม่ระบุตัวตน (Incognito)');
-          }
-          if (response.status === 404) {
-            throw new Error('ระบบ Google บล็อกการเข้าถึง (404) - คุณยังไม่ได้ตั้งค่าสิทธิ์ให้เป็น "Anyone" (ทุกคน) ในตอนที่กด Deploy');
-          }
-          throw new Error('URL ไม่ถูกต้อง หรือยังไม่ได้ตั้งค่าสิทธิ์ Apps Script เป็น "Anyone" (ทุกคน). กรุณาตรวจสอบการตั้งค่า Deploy ใน Apps Script.');
+        data = JSON.parse(text);
+      } catch (parseErr: any) {
+        console.error("Failed to parse JSON. Response text preview:", text.substring(0, 200));
+        if (text.includes("Starting Server") || text.includes("Please wait while your application starts")) {
+          throw new Error('ระบบเซิร์ฟเวอร์กำลังเริ่มต้นการทำงาน... กรุณารอสักครู่ (ประมาณ 5-10 วินาที) แล้วลองใหม่อีกครั้ง (Server is starting up)');
         }
-      } catch (err: any) {
-        throw err;
+        if (text.includes("Sign in - Google Accounts") || text.includes("<title>Google Drive</title>")) {
+           throw new Error('Google บล็อกการเข้าถึง - คุณต้องตั้งค่าสิทธิ์ Apps Script เป็น "Anyone" (ทุกคน) ตอน Deploy หรือลองเปิดในหน้าต่างไม่ระบุตัวตน (Incognito)');
+        }
+        if (response.status === 404) {
+           throw new Error('ระบบ Google บล็อกการเข้าถึง (404) - คุณยังไม่ได้ตั้งค่าสิทธิ์ให้เป็น "Anyone" (ทุกคน) ในตอนที่กด Deploy');
+        }
+        throw new Error('URL ไม่ถูกต้อง หรือยังไม่ได้ตั้งค่าสิทธิ์ Apps Script เป็น "Anyone" (ทุกคน). กรุณาตรวจสอบการตั้งค่า Deploy ใน Apps Script.');
       }
+
       if (data && data.error) {
         throw new Error(data.error);
       }

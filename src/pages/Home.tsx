@@ -170,11 +170,9 @@ export default function Home({ onAddToCart }: HomeProps) {
     };
 
     fetchProducts(true);
-    const intervalId = setInterval(() => fetchProducts(false), 3000);
 
     return () => {
       isMounted = false;
-      clearInterval(intervalId);
     };
   }, []);
 

@@ -52,6 +52,7 @@ import {
   Hash,
   MapPin,
   Upload,
+  Edit,
   AlertCircle,
   Trash2,
   Scissors,
@@ -361,8 +362,8 @@ export default function AdminDashboard() {
       const orderRef = doc(db, 'orders', orderId);
       await setDoc(orderRef, { slipUrl: base64data }, { merge: true });
 
-      // Update local state by mutating the orders array so the UI reflects the change immediately
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, slipUrl: base64data } : o));
+      // Update in Google Sheets & Local state
+      await safeUpdateOrder(orderId, { slipUrl: base64data });
 
       // Also update selectedOrder if it is currently open
       if (selectedOrder && selectedOrder.id === orderId) {
@@ -496,6 +497,13 @@ export default function AdminDashboard() {
   });
   const [filterDate, setFilterDate] = useState<Date | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [localSearchQuery, setLocalSearchQuery] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(localSearchQuery);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [localSearchQuery]);
   const [viewingTrackingOrder, setViewingTrackingOrder] =
     useState<Order | null>(null);
   const captureRef = React.useRef<HTMLDivElement>(null);
@@ -2134,6 +2142,13 @@ export default function AdminDashboard() {
     >(null);
     const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
     const [searchQuery, setSearchQuery] = useState("");
+    const [localSearchQuery, setLocalSearchQuery] = useState("");
+    useEffect(() => {
+      const timer = setTimeout(() => {
+        setSearchQuery(localSearchQuery);
+      }, 250);
+      return () => clearTimeout(timer);
+    }, [localSearchQuery]);
     const [isUndoing, setIsUndoing] = useState<string | null>(null);
     const [orderedFilter, setOrderedFilter] = useState<"all" | "ordered" | "not_ordered">("all");
     const [embroideredFilter, setEmbroideredFilter] = useState<"all" | "embroidered" | "not_embroidered">("all");
@@ -3385,7 +3400,7 @@ export default function AdminDashboard() {
                 onClick={() => {
                   setSelectedType(null);
                   setSelectedItems(new Set());
-                  setSearchQuery("");
+                  setLocalSearchQuery("");
                   setOrderedFilter("all");
                   setEmbroideredFilter("all");
                 }}
@@ -3403,8 +3418,8 @@ export default function AdminDashboard() {
                   <input
                     type="text"
                     placeholder="ค้นหา..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    value={localSearchQuery}
+                    onChange={(e) => setLocalSearchQuery(e.target.value)}
                     className="pl-10 pr-4 py-2 bg-army-bg border-2 border-army-bg focus:border-army-dark rounded-xl text-sm font-bold outline-none transition-all w-64"
                   />
                 </div>
@@ -5983,8 +5998,8 @@ export default function AdminDashboard() {
                   <input
                     type="text"
                     placeholder="ค้นหาชื่อหรือหมายเลขรายการ..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    value={localSearchQuery}
+                    onChange={(e) => setLocalSearchQuery(e.target.value)}
                     className="w-full pl-10 pr-4 py-3 bg-army-bg border-2 border-army-bg rounded-xl text-xs font-black uppercase tracking-tight outline-none focus:border-army-dark transition-all"
                   />
                 </div>
@@ -6260,39 +6275,65 @@ export default function AdminDashboard() {
                                     !order.aiVerification.amountMatches);
                                 const isWarning = isDuplicate || aiBad;
                                 return (
-                                  <button
-                                    onClick={() =>
-                                      setViewingSlipUrl(slipContent!)
-                                    }
-                                    className={cn(
-                                      "flex flex-col items-center justify-center px-2 py-1.5 rounded-lg border transition-all shadow-sm whitespace-nowrap w-full",
-                                      isWarning
-                                        ? "bg-red-100 text-red-700 hover:bg-red-200 border-red-200"
-                                        : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-200",
-                                    )}
-                                  >
-                                    <div className="flex items-center space-x-1">
-                                      <Eye size={14} />
-                                      <span className="text-[10px] font-black">
-                                        {isWarning
-                                          ? "ตรวจสอบสลิป"
-                                          : "ดูรูปสลิป"}
-                                      </span>
-                                    </div>
-                                    {isDuplicate && (
-                                      <span className="text-[8px] font-bold text-red-600 mt-0.5">
-                                        ⚠️ สลิปซ้ำ
-                                      </span>
-                                    )}
-                                    {aiBad && (
-                                      <span
-                                        className="text-[8px] font-bold text-red-600 mt-0.5"
-                                        title={order.aiVerification!.message}
+                                  <div className="flex flex-col gap-1 w-full">
+                                    <button
+                                      onClick={() =>
+                                        setViewingSlipUrl(slipContent!)
+                                      }
+                                      className={cn(
+                                        "flex flex-col items-center justify-center px-2 py-1.5 rounded-lg border transition-all shadow-sm whitespace-nowrap w-full",
+                                        isWarning
+                                          ? "bg-red-100 text-red-700 hover:bg-red-200 border-red-200"
+                                          : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-200",
+                                      )}
+                                    >
+                                      <div className="flex items-center space-x-1">
+                                        <Eye size={14} />
+                                        <span className="text-[10px] font-black">
+                                          {isWarning
+                                            ? "ตรวจสอบสลิป"
+                                            : "ดูรูปสลิป"}
+                                        </span>
+                                      </div>
+                                      {isDuplicate && (
+                                        <span className="text-[8px] font-bold text-red-600 mt-0.5">
+                                          ⚠️ สลิปซ้ำ
+                                        </span>
+                                      )}
+                                      {aiBad && (
+                                        <span
+                                          className="text-[8px] font-bold text-red-600 mt-0.5"
+                                          title={order.aiVerification!.message}
+                                        >
+                                          ⚠️ ยอดไม่ตรง/ปลอม
+                                        </span>
+                                      )}
+                                    </button>
+                                    <div className="relative w-full">
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        id={`upload-slip-${order.id}`}
+                                        className="hidden"
+                                        onChange={(e) => handleAdminUploadSlip(order.id, e)}
+                                      />
+                                      <label
+                                        htmlFor={`upload-slip-${order.id}`}
+                                        className="flex items-center justify-center px-2 py-1 rounded-lg border transition-all shadow-sm bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 w-full cursor-pointer"
                                       >
-                                        ⚠️ ยอดไม่ตรง/ปลอม
-                                      </span>
-                                    )}
-                                  </button>
+                                        <div className="flex items-center justify-center space-x-1">
+                                          {uploadingSlipId === order.id ? (
+                                            <span className="text-[9px] font-black animate-pulse">กำลังอัปโหลด...</span>
+                                          ) : (
+                                            <>
+                                              <Edit size={12} />
+                                              <span className="text-[9px] font-black">แก้ไขสลิป</span>
+                                            </>
+                                          )}
+                                        </div>
+                                      </label>
+                                    </div>
+                                  </div>
                                 );
                               })()}
 
@@ -7456,6 +7497,30 @@ export default function AdminDashboard() {
                                       : "ดูรูปสลิปโอนเงิน"}
                                 </span>
                               </button>
+                              <div className="relative w-full">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  id={`upload-slip-drawer-${selectedOrder.id}`}
+                                  className="hidden"
+                                  onChange={(e) => handleAdminUploadSlip(selectedOrder.id, e)}
+                                />
+                                <label
+                                  htmlFor={`upload-slip-drawer-${selectedOrder.id}`}
+                                  className="inline-flex items-center justify-center space-x-2 p-3 rounded-xl transition-all w-full shadow-md bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 cursor-pointer"
+                                >
+                                  {uploadingSlipId === selectedOrder.id ? (
+                                    <span className="font-bold whitespace-normal text-center text-xs animate-pulse">กำลังอัปโหลด...</span>
+                                  ) : (
+                                    <>
+                                      <Edit size={16} />
+                                      <span className="font-bold whitespace-normal text-center text-xs">
+                                        แก้ไข/อัปโหลดสลิปใหม่
+                                      </span>
+                                    </>
+                                  )}
+                                </label>
+                              </div>
                               {selectedOrder.aiVerification && (
                                 <div className="text-[10px] p-2 rounded-lg bg-gray-50 border border-gray-200">
                                   <p>

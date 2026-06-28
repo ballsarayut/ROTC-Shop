@@ -60,8 +60,10 @@ async function startServer() {
     if (isFetchingCache) return;
     isFetchingCache = true;
     try {
-      const sheetUrl = process.env.VITE_GOOGLE_SHEET_URL;
-      if (!sheetUrl) return;
+      let sheetUrl = process.env.VITE_GOOGLE_SHEET_URL;
+      if (!sheetUrl || sheetUrl === 'undefined' || sheetUrl === 'null' || sheetUrl.trim() === '') {
+        sheetUrl = "https://script.google.com/macros/s/AKfycbyCb7Byo0Zn8-VtxQ-6xwy0K0UR42s_8U4zcUfR6ReFIlILZ18Nt-dvJLk1dd6VtgEI/exec";
+      }
       
       const sheets = ['Orders', 'Products', 'TrainingCenters', 'Schools', 'Settings', 'Admins'];
       const results: any = {};
@@ -121,34 +123,129 @@ async function startServer() {
   });
 
   app.get('/api/fetch-sheet-proxy', async (req, res) => {
-    const url = req.query.url as string;
+    let url = "";
+    const originalUrl = req.originalUrl;
+    const urlMarker = "url=";
+    const markerIndex = originalUrl.indexOf(urlMarker);
+    if (markerIndex !== -1) {
+      const rawUrlParam = originalUrl.slice(markerIndex + urlMarker.length);
+      try {
+        url = decodeURIComponent(rawUrlParam);
+      } catch (e) {
+        url = rawUrlParam;
+      }
+    } else {
+      url = req.query.url as string;
+    }
+    
+    // Clean up "undefined" or "null" string prefix
+    if (url) {
+      const baseUrl = process.env.VITE_GOOGLE_SHEET_URL || "https://script.google.com/macros/s/AKfycbyCb7Byo0Zn8-VtxQ-6xwy0K0UR42s_8U4zcUfR6ReFIlILZ18Nt-dvJLk1dd6VtgEI/exec";
+      if (url.startsWith("undefined") || url.startsWith("null")) {
+        url = url.replace(/^(undefined|null)/, baseUrl);
+      } else if (url.includes("execundefined") || url.includes("execnull")) {
+        url = url.replace("execundefined", "exec").replace("execnull", "exec");
+      }
+    }
+    
+    console.log("[PROXY GET] originalUrl:", originalUrl);
+    console.log("[PROXY GET] Extracted url:", url);
+    console.log("[PROXY GET] req.query.url:", req.query.url);
+    
     if (!url) return res.status(400).send("No URL provided");
+    
+    // Robust fallback if client environment variables are not loaded in Vite bundle
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      const baseUrl = process.env.VITE_GOOGLE_SHEET_URL || "https://script.google.com/macros/s/AKfycbyCb7Byo0Zn8-VtxQ-6xwy0K0UR42s_8U4zcUfR6ReFIlILZ18Nt-dvJLk1dd6VtgEI/exec";
+      if (url.startsWith('?')) {
+        url = baseUrl + url;
+      } else {
+        url = baseUrl + '?' + url;
+      }
+      console.log("[PROXY GET] Applied fallback. Final url:", url);
+    }
+    
     try {
-      const response = await fetch(url, { redirect: 'follow' });
-      if (!response.ok) throw new Error("Proxy fetch failed");
+      const response = await fetch(url, { 
+        redirect: 'follow',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      });
+      if (!response.ok) {
+        const textErr = await response.text().catch(() => "N/A");
+        throw new Error(`Proxy fetch failed with status ${response.status}: ${textErr.substring(0, 200)}`);
+      }
       const data = await response.text();
       res.send(data);
-    } catch(e) {
-      console.error(e);
-      res.status(500).json({ error: "Failed to fetch from sheets" });
+    } catch(e: any) {
+      console.error("[Proxy GET Error]", e);
+      res.status(500).json({ error: "Failed to fetch from sheets", details: e.message });
     }
   });
 
   app.post('/api/post-sheet-proxy', async (req, res) => {
-    const url = req.query.url as string;
+    let url = "";
+    const originalUrl = req.originalUrl;
+    const urlMarker = "url=";
+    const markerIndex = originalUrl.indexOf(urlMarker);
+    if (markerIndex !== -1) {
+      const rawUrlParam = originalUrl.slice(markerIndex + urlMarker.length);
+      try {
+        url = decodeURIComponent(rawUrlParam);
+      } catch (e) {
+        url = rawUrlParam;
+      }
+    } else {
+      url = req.query.url as string;
+    }
+    
+    // Clean up "undefined" or "null" string prefix
+    if (url) {
+      const baseUrl = process.env.VITE_GOOGLE_SHEET_URL || "https://script.google.com/macros/s/AKfycbyCb7Byo0Zn8-VtxQ-6xwy0K0UR42s_8U4zcUfR6ReFIlILZ18Nt-dvJLk1dd6VtgEI/exec";
+      if (url.startsWith("undefined") || url.startsWith("null")) {
+        url = url.replace(/^(undefined|null)/, baseUrl);
+      } else if (url.includes("execundefined") || url.includes("execnull")) {
+        url = url.replace("execundefined", "exec").replace("execnull", "exec");
+      }
+    }
+    
+    console.log("[PROXY POST] originalUrl:", originalUrl);
+    console.log("[PROXY POST] Extracted url:", url);
+    console.log("[PROXY POST] req.body keys:", req.body ? Object.keys(req.body) : "none");
+    
     if (!url) return res.status(400).send("No URL provided");
+    
+    // Robust fallback if client environment variables are not loaded in Vite bundle
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      const baseUrl = process.env.VITE_GOOGLE_SHEET_URL || "https://script.google.com/macros/s/AKfycbyCb7Byo0Zn8-VtxQ-6xwy0K0UR42s_8U4zcUfR6ReFIlILZ18Nt-dvJLk1dd6VtgEI/exec";
+      if (url.startsWith('?')) {
+        url = baseUrl + url;
+      } else {
+        url = baseUrl + '?' + url;
+      }
+      console.log("[PROXY POST] Applied fallback. Final url:", url);
+    }
+    
     try {
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        headers: { 
+          'Content-Type': 'text/plain;charset=utf-8',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        },
         body: typeof req.body === 'string' ? req.body : JSON.stringify(req.body),
         redirect: 'follow'
       });
+      if (!response.ok) {
+        const textErr = await response.text().catch(() => "N/A");
+        throw new Error(`Proxy POST failed with status ${response.status}: ${textErr.substring(0, 200)}`);
+      }
       const data = await response.text();
       res.send(data);
-    } catch(e) {
-      console.error(e);
-      res.status(500).json({ error: "Failed to post to sheets" });
+    } catch(e: any) {
+      console.error("[Proxy POST Error]", e);
+      res.status(500).json({ error: "Failed to post to sheets", details: e.message });
     }
   });
 

@@ -26,7 +26,6 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
 
   useEffect(() => {
     let isMounted = true;
-    let intervalId: any;
 
     const fetchProduct = async (showLoading = true) => {
       if (!id) return;
@@ -121,15 +120,8 @@ export default function ProductDetail({ onAddToCart }: ProductDetailProps) {
         setLoading(false);
     });
     
-    intervalId = setInterval(() => {
-      if (isMounted) {
-        fetchProduct(false).catch(e => console.error("ProductDetail fetchProduct error:", e));
-      }
-    }, 3000);
-
     return () => {
       isMounted = false;
-      clearInterval(intervalId);
     };
   }, [id, navigate]);
 
