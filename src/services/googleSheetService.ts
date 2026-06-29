@@ -98,8 +98,7 @@ export const googleSheetService = {
       });
 
       const targetUrl = SCRIPT_URL;
-      const proxyUrl = `/api/post-sheet-proxy?url=${encodeURIComponent(targetUrl)}`;
-      const response = await fetch(proxyUrl, {
+      const response = await fetch(targetUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'text/plain;charset=utf-8',
@@ -205,8 +204,7 @@ export const googleSheetService = {
       let batchSucceeded = false;
       try {
         const targetUrl = SCRIPT_URL;
-        const proxyUrl = `/api/post-sheet-proxy?url=${encodeURIComponent(targetUrl)}`;
-        const response = await fetch(proxyUrl, {
+        const response = await fetch(targetUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'text/plain;charset=utf-8',
@@ -243,8 +241,7 @@ export const googleSheetService = {
       for (const record of sanitizedPayloads) {
         try {
           const targetUrl = SCRIPT_URL;
-          const proxyUrl = `/api/post-sheet-proxy?url=${encodeURIComponent(targetUrl)}`;
-          const response = await fetch(proxyUrl, {
+          const response = await fetch(targetUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'text/plain;charset=utf-8',
@@ -283,8 +280,7 @@ export const googleSheetService = {
 
     try {
       const targetUrl = SCRIPT_URL;
-      const proxyUrl = `/api/post-sheet-proxy?url=${encodeURIComponent(targetUrl)}`;
-      const response = await fetch(proxyUrl, {
+      const response = await fetch(targetUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'text/plain;charset=utf-8',
@@ -313,8 +309,7 @@ export const googleSheetService = {
 
     try {
       const targetUrl = SCRIPT_URL;
-      const proxyUrl = `/api/post-sheet-proxy?url=${encodeURIComponent(targetUrl)}`;
-      const response = await fetch(proxyUrl, {
+      const response = await fetch(targetUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'text/plain;charset=utf-8',
@@ -374,8 +369,7 @@ export const googleSheetService = {
 
     try {
       const targetUrl = `${SCRIPT_URL}?action=read&sheet=${sheet}&_t=${Date.now()}`;
-      const proxyUrl = `/api/fetch-sheet-proxy?url=${encodeURIComponent(targetUrl)}`;
-      const response = await fetch(proxyUrl);
+      const response = await fetch(targetUrl);
       if (!response.ok) {
         let errDetails = `HTTP Error ${response.status}`;
         try {
@@ -397,10 +391,13 @@ export const googleSheetService = {
         if (text.includes("Sign in - Google Accounts") || text.includes("<title>Google Drive</title>")) {
            throw new Error('Google บล็อกการเข้าถึง - คุณต้องตั้งค่าสิทธิ์ Apps Script เป็น "Anyone" (ทุกคน) ตอน Deploy หรือลองเปิดในหน้าต่างไม่ระบุตัวตน (Incognito)');
         }
+        if (text.includes("Too Many Requests") || text.includes("Service unavailable") || text.includes("Rate limit") || text.includes("Sorry, unable to open the file at this time")) {
+           throw new Error('Google Sheets ถูกดึงข้อมูลถี่เกินไป (Rate Limit) ทำให้ระบบค้าง กรุณารอสักครู่แล้วลองใหม่');
+        }
         if (response.status === 404) {
            throw new Error('ระบบ Google บล็อกการเข้าถึง (404) - คุณยังไม่ได้ตั้งค่าสิทธิ์ให้เป็น "Anyone" (ทุกคน) ในตอนที่กด Deploy');
         }
-        throw new Error('URL ไม่ถูกต้อง หรือยังไม่ได้ตั้งค่าสิทธิ์ Apps Script เป็น "Anyone" (ทุกคน). กรุณาตรวจสอบการตั้งค่า Deploy ใน Apps Script.');
+        throw new Error('เชื่อมต่อ Google Sheets ไม่สำเร็จ (ข้อมูลส่งกลับมาผิดปกติ) อาจเกิดจากการดึงถี่เกินไป กรุณารอสักครู่แล้วกดโหลดใหม่');
       }
 
       if (data && data.error) {
