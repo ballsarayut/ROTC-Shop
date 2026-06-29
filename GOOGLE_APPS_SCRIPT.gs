@@ -109,7 +109,7 @@ function deleteRecord(sheet, id) {
 function getOrUpdateHeaders(sheet, payload) {
   let headers = [];
   if (sheet.getLastColumn() > 0) {
-    headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => h ? h.toString() : '');
   }
 
   const payloadKeys = Object.keys(payload);
@@ -132,9 +132,9 @@ function getOrUpdateHeaders(sheet, payload) {
 }
 
 function getSheetData(sheet) {
-  if (sheet.getLastRow() < 2) return [];
+  if (sheet.getLastRow() < 2 || sheet.getLastColumn() < 1) return [];
   
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => h ? h.toString() : '');
   const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
   
   return values.map(row => {
@@ -159,7 +159,7 @@ function batchSync(sheet, payloads) {
   // 1. Get or update headers
   let headers = [];
   if (sheet.getLastColumn() > 0) {
-    headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => h ? h.toString() : '');
   } else {
     headers = ['id'];
   }
