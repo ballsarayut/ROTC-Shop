@@ -51,6 +51,7 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json({ limit: '10mb' }));
+  app.use(express.text({ limit: '10mb', type: 'text/plain' }));
 
   // Sheet background cache
   let globalSheetCache: any = null;
@@ -166,16 +167,31 @@ async function startServer() {
     }
     
     try {
-      const response = await fetch(url, { 
-        redirect: 'follow',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      let response;
+      let retries = 3;
+      let textErr = "N/A";
+      while (retries > 0) {
+        response = await fetch(url, { 
+          redirect: 'follow',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          }
+        });
+        if (response.ok) {
+          break;
         }
-      });
-      if (!response.ok) {
-        const textErr = await response.text().catch(() => "N/A");
-        throw new Error(`Proxy fetch failed with status ${response.status}: ${textErr.substring(0, 200)}`);
+        textErr = await response.text().catch(() => "N/A");
+        retries--;
+        if (retries > 0) {
+          console.warn(`[Proxy GET Error] Status ${response?.status}. Retrying... (${retries} attempts left)`);
+          await new Promise(res => setTimeout(res, 2000)); // wait 2 seconds before retry
+        }
       }
+
+      if (!response || !response.ok) {
+        throw new Error(`Proxy fetch failed with status ${response?.status}: ${textErr.substring(0, 200)}`);
+      }
+      
       const data = await response.text();
       res.send(data);
     } catch(e: any) {
@@ -228,18 +244,31 @@ async function startServer() {
     }
     
     try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'text/plain;charset=utf-8',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        },
-        body: typeof req.body === 'string' ? req.body : JSON.stringify(req.body),
-        redirect: 'follow'
-      });
-      if (!response.ok) {
-        const textErr = await response.text().catch(() => "N/A");
-        throw new Error(`Proxy POST failed with status ${response.status}: ${textErr.substring(0, 200)}`);
+      let response;
+      let retries = 3;
+      let textErr = "N/A";
+      while (retries > 0) {
+        response = await fetch(url, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'text/plain;charset=utf-8',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          },
+          body: typeof req.body === 'string' ? req.body : JSON.stringify(req.body),
+          redirect: 'follow'
+        });
+        if (response.ok) {
+          break;
+        }
+        textErr = await response.text().catch(() => "N/A");
+        retries--;
+        if (retries > 0) {
+          console.warn(`[Proxy POST Error] Status ${response?.status}. Retrying... (${retries} attempts left)`);
+          await new Promise(res => setTimeout(res, 2000));
+        }
+      }
+      if (!response || !response.ok) {
+        throw new Error(`Proxy POST failed with status ${response?.status}: ${textErr.substring(0, 200)}`);
       }
       const data = await response.text();
       res.send(data);

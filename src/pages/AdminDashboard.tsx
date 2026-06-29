@@ -163,6 +163,41 @@ export const sortOrderItemsBySize = (items: any[]) => {
   });
 };
 
+const DebouncedSearchInput = ({
+  value,
+  onChange,
+  placeholder,
+  className,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  placeholder?: string;
+  className?: string;
+}) => {
+  const [localValue, setLocalValue] = useState(value);
+
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onChange(localValue);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [localValue, onChange]);
+
+  return (
+    <input
+      type="text"
+      placeholder={placeholder}
+      value={localValue}
+      onChange={(e) => setLocalValue(e.target.value)}
+      className={className}
+    />
+  );
+};
+
 export default function AdminDashboard() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastType, setToastType] = useState<"success" | "error" | "info">("success");
@@ -497,13 +532,6 @@ export default function AdminDashboard() {
   });
   const [filterDate, setFilterDate] = useState<Date | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [localSearchQuery, setLocalSearchQuery] = useState("");
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setSearchQuery(localSearchQuery);
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [localSearchQuery]);
   const [viewingTrackingOrder, setViewingTrackingOrder] =
     useState<Order | null>(null);
   const captureRef = React.useRef<HTMLDivElement>(null);
@@ -2142,13 +2170,6 @@ export default function AdminDashboard() {
     >(null);
     const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
     const [searchQuery, setSearchQuery] = useState("");
-    const [localSearchQuery, setLocalSearchQuery] = useState("");
-    useEffect(() => {
-      const timer = setTimeout(() => {
-        setSearchQuery(localSearchQuery);
-      }, 250);
-      return () => clearTimeout(timer);
-    }, [localSearchQuery]);
     const [isUndoing, setIsUndoing] = useState<string | null>(null);
     const [orderedFilter, setOrderedFilter] = useState<"all" | "ordered" | "not_ordered">("all");
     const [embroideredFilter, setEmbroideredFilter] = useState<"all" | "embroidered" | "not_embroidered">("all");
@@ -3400,7 +3421,7 @@ export default function AdminDashboard() {
                 onClick={() => {
                   setSelectedType(null);
                   setSelectedItems(new Set());
-                  setLocalSearchQuery("");
+                  setSearchQuery("");
                   setOrderedFilter("all");
                   setEmbroideredFilter("all");
                 }}
@@ -3415,11 +3436,10 @@ export default function AdminDashboard() {
                     className="absolute left-3 top-1/2 -translate-y-1/2 text-army-muted"
                     size={16}
                   />
-                  <input
-                    type="text"
+                  <DebouncedSearchInput
                     placeholder="ค้นหา..."
-                    value={localSearchQuery}
-                    onChange={(e) => setLocalSearchQuery(e.target.value)}
+                    value={searchQuery}
+                    onChange={(val) => setSearchQuery(val)}
                     className="pl-10 pr-4 py-2 bg-army-bg border-2 border-army-bg focus:border-army-dark rounded-xl text-sm font-bold outline-none transition-all w-64"
                   />
                 </div>
@@ -5995,11 +6015,10 @@ export default function AdminDashboard() {
                     className="absolute left-4 top-1/2 -translate-y-1/2 text-army-muted"
                     size={16}
                   />
-                  <input
-                    type="text"
+                  <DebouncedSearchInput
                     placeholder="ค้นหาชื่อหรือหมายเลขรายการ..."
-                    value={localSearchQuery}
-                    onChange={(e) => setLocalSearchQuery(e.target.value)}
+                    value={searchQuery}
+                    onChange={(val) => setSearchQuery(val)}
                     className="w-full pl-10 pr-4 py-3 bg-army-bg border-2 border-army-bg rounded-xl text-xs font-black uppercase tracking-tight outline-none focus:border-army-dark transition-all"
                   />
                 </div>

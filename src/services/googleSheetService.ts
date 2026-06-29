@@ -110,7 +110,9 @@ export const googleSheetService = {
           payload: sanitizedPayload,
         }),
       });
-      
+      if (!response.ok) {
+        throw new Error(`HTTP Error ${response.status}`);
+      }
       return true;
     } catch (error) {
       console.warn(`Error syncing ${sheet} to Google Sheets: Is VITE_GOOGLE_SHEET_URL configured correctly?`);
@@ -282,7 +284,7 @@ export const googleSheetService = {
     try {
       const targetUrl = SCRIPT_URL;
       const proxyUrl = `/api/post-sheet-proxy?url=${encodeURIComponent(targetUrl)}`;
-      await fetch(proxyUrl, {
+      const response = await fetch(proxyUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'text/plain;charset=utf-8',
@@ -293,6 +295,9 @@ export const googleSheetService = {
           payload: { id },
         }),
       });
+      if (!response.ok) {
+        throw new Error(`HTTP Error ${response.status}`);
+      }
       return true;
     } catch (error) {
       console.warn(`Error deleting ${sheet} from Google Sheets: Is VITE_GOOGLE_SHEET_URL configured correctly?`);
@@ -324,7 +329,29 @@ export const googleSheetService = {
           },
         }),
       });
-      const data = await response.json();
+      if (!response.ok) {
+        let errDetails = `HTTP Error ${response.status}`;
+        try {
+          const errData = await response.json();
+          if (errData.details) errDetails += `: ${errData.details}`;
+          else if (errData.error) errDetails += `: ${errData.error}`;
+        } catch(e) {}
+        throw new Error(errDetails);
+      }
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (parseError) {
+        console.error("Failed to parse JSON in uploadFile:", text);
+        if (text.includes("Starting Server") || text.includes("Please wait")) {
+           throw new Error('ระบบกำลังเริ่มต้นการทำงาน... กรุณารอสักครู่ (Server is starting up)');
+        }
+        if (response.status === 404 || text.includes("Sign in - Google Accounts")) {
+           throw new Error('Google บล็อกการเข้าถึง - คุณต้องตั้งค่าสิทธิ์ Apps Script เป็น "Anyone" (ทุกคน) ตอน Deploy');
+        }
+        throw new Error(`Invalid response from server. Status: ${response.status}`);
+      }
       if (data && data.status === 'success') {
         return data.url;
       } else {
@@ -349,7 +376,14 @@ export const googleSheetService = {
       const targetUrl = `${SCRIPT_URL}?action=read&sheet=${sheet}&_t=${Date.now()}`;
       const proxyUrl = `/api/fetch-sheet-proxy?url=${encodeURIComponent(targetUrl)}`;
       const response = await fetch(proxyUrl);
-      if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
+      if (!response.ok) {
+        let errDetails = `HTTP Error ${response.status}`;
+        try {
+          const errData = await response.json();
+          if (errData.details) errDetails += `: ${errData.details}`;
+        } catch(e) {}
+        throw new Error(errDetails);
+      }
       
       const text = await response.text();
       let data;
