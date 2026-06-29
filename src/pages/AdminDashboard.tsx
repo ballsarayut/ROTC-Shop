@@ -1080,12 +1080,12 @@ export default function AdminDashboard() {
     })();
 
     fetchOrders(!hasCache);
-    const intervalId = setInterval(() => fetchOrders(false, false), 15000); // 15s polling to safeguard free-tier Firestore quota from depletion
-
+    // Auto-polling removed to prevent UI freezing (stutter) on large datasets.
+    // Users can manually refresh data using the "Refresh" button.
+    
     // remove onSnapshot
     const unsubscribeOrders = () => {
       isMounted = false;
-      clearInterval(intervalId);
     };
 
     const fetchDashboardData = async () => {

@@ -98,7 +98,8 @@ export const googleSheetService = {
       });
 
       const targetUrl = SCRIPT_URL;
-      const response = await fetch(targetUrl, {
+      const proxyUrl = `/api/post-sheet-proxy?url=${encodeURIComponent(targetUrl)}`;
+      const response = await fetch(proxyUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'text/plain;charset=utf-8',
@@ -204,7 +205,8 @@ export const googleSheetService = {
       let batchSucceeded = false;
       try {
         const targetUrl = SCRIPT_URL;
-        const response = await fetch(targetUrl, {
+        const proxyUrl = `/api/post-sheet-proxy?url=${encodeURIComponent(targetUrl)}`;
+        const response = await fetch(proxyUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'text/plain;charset=utf-8',
@@ -241,7 +243,8 @@ export const googleSheetService = {
       for (const record of sanitizedPayloads) {
         try {
           const targetUrl = SCRIPT_URL;
-          const response = await fetch(targetUrl, {
+          const proxyUrl = `/api/post-sheet-proxy?url=${encodeURIComponent(targetUrl)}`;
+          const response = await fetch(proxyUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'text/plain;charset=utf-8',
@@ -280,7 +283,8 @@ export const googleSheetService = {
 
     try {
       const targetUrl = SCRIPT_URL;
-      const response = await fetch(targetUrl, {
+      const proxyUrl = `/api/post-sheet-proxy?url=${encodeURIComponent(targetUrl)}`;
+      const response = await fetch(proxyUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'text/plain;charset=utf-8',
@@ -309,7 +313,8 @@ export const googleSheetService = {
 
     try {
       const targetUrl = SCRIPT_URL;
-      const response = await fetch(targetUrl, {
+      const proxyUrl = `/api/post-sheet-proxy?url=${encodeURIComponent(targetUrl)}`;
+      const response = await fetch(proxyUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'text/plain;charset=utf-8',
@@ -369,7 +374,8 @@ export const googleSheetService = {
 
     try {
       const targetUrl = `${SCRIPT_URL}?action=read&sheet=${sheet}&_t=${Date.now()}`;
-      const response = await fetch(targetUrl);
+      const proxyUrl = `/api/fetch-sheet-proxy?url=${encodeURIComponent(targetUrl)}`;
+      const response = await fetch(proxyUrl);
       if (!response.ok) {
         let errDetails = `HTTP Error ${response.status}`;
         try {
