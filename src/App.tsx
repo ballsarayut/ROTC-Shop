@@ -79,7 +79,26 @@ export default function App() {
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettings | null>(null);
 
   useEffect(() => {
-    localStorage.setItem('school_shop_cart', JSON.stringify(cart));
+    try {
+      localStorage.setItem('school_shop_cart', JSON.stringify(cart));
+    } catch (e: any) {
+      console.error("Failed to save cart to localStorage (QuotaExceededError?)", e);
+      // Attempt to save a minimal version without potentially large base64 imageUrls
+      try {
+        const minimalCart = cart.map(item => {
+          const { imageUrl, ...rest } = item;
+          // Only keep imageUrl if it's a short regular URL, not a massive base64 string
+          if (imageUrl && !imageUrl.startsWith('data:image')) {
+            return { ...rest, imageUrl };
+          }
+          return rest;
+        });
+        localStorage.setItem('school_shop_cart', JSON.stringify(minimalCart));
+      } catch (innerE) {
+        console.error("Still failed to save minimal cart", innerE);
+        localStorage.removeItem('school_shop_cart'); // Fallback: clear the storage so it doesn't stay broken
+      }
+    }
   }, [cart]);
 
   useEffect(() => {
